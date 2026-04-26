@@ -174,6 +174,7 @@ let cameraInitialized = false;
 let lastFitDims = null;         // [stackW, stackD, stackH] of the last camera-fit pack
 let nestingResult = null;       // { strides: [sx, sy, sz] } in raw STL units
 let nestingComputing = false;
+let nestingGen = 0;             // bumped on each loadFromBuffer; stale computes abort
 
 let instancedMesh = null;
 let bboxLine = null;
@@ -278,7 +279,7 @@ function loadFromBuffer(buf) {
   }
   cameraInitialized = false;
   nestingResult = null;
-  nestingComputing = false;
+  nestingGen++;                 // any inflight nesting compute will see a stale gen and abort
   geo.computeBoundingBox();
   const bb = geo.boundingBox;
   const size = new THREE.Vector3().subVectors(bb.max, bb.min);
@@ -295,41 +296,47 @@ function loadFromBuffer(buf) {
 }
 
 async function computeNesting() {
-  if (!partGeoRaw || nestingComputing) return;
+  const myGen = nestingGen;
+  const localGeo = partGeoRaw;
+  if (!localGeo) return;
   nestingComputing = true;
   await new Promise(r => setTimeout(r, 30));   // let the UI paint "computing" state
+  if (myGen !== nestingGen) { nestingComputing = false; return; }
   try {
-    partGeoRaw.computeBoundsTree();
+    localGeo.computeBoundsTree();
     const [w, d, h] = rawExtents;
     const partExtents = [w, d, h];
 
     // Pure translation strides: 3 axes
     const strides = [
-      findStride(partGeoRaw, 0, w, null),
-      findStride(partGeoRaw, 1, d, null),
-      findStride(partGeoRaw, 2, h, null),
+      findStride(localGeo, 0, w, null),
+      findStride(localGeo, 1, d, null),
+      findStride(localGeo, 2, h, null),
     ];
+    if (myGen !== nestingGen) { nestingComputing = false; return; }
 
-    // Alternating-flip strides: for each (stack_axis, flip_axis) pair, where flip_axis ≠ stack_axis
-    // (flipping around the stack axis doesn't change the silhouette in the stacking direction).
-    // 3 stack × 2 flip = 6 combinations.
+    // Alternating-flip strides: 3 stack × 2 flip = 6 combinations
     const flipStrides = [];
     for (let stack = 0; stack < 3; stack++) {
       for (let flip = 0; flip < 3; flip++) {
         if (flip === stack) continue;
-        const s = findStride(partGeoRaw, stack, partExtents[stack], flip);
+        const s = findStride(localGeo, stack, partExtents[stack], flip);
         flipStrides.push({ stack, flip, stride: s });
+        if (myGen !== nestingGen) { nestingComputing = false; return; }
       }
     }
 
+    if (myGen !== nestingGen) { nestingComputing = false; return; }
     nestingResult = { strides, flipStrides };
   } catch (err) {
     console.error('Nesting failed:', err);
-    nestingResult = { error: err.message };
+    if (myGen === nestingGen) nestingResult = { error: err.message };
   } finally {
     nestingComputing = false;
-    cameraInitialized = false;  // Force a camera refit so the post-nesting bbox shows up sized correctly
-    rebuildPack();
+    if (myGen === nestingGen) {
+      cameraInitialized = false;   // Force a refit so the post-nesting bbox shows up sized correctly
+      rebuildPack();
+    }
   }
 }
 
