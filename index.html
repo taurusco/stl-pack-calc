@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>STL Fit Calculator</title>
+    <title>A - Roark Container Fit Counter</title>
     <style>
       :root {
         color-scheme: light;
@@ -69,6 +69,20 @@
         font-size: 13px;
         font-weight: 800;
         letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .variant-badge {
+        display: inline-block;
+        margin: 0 0 8px;
+        padding: 4px 8px;
+        border: 1px solid #99f6e4;
+        border-radius: 6px;
+        background: #ccfbf1;
+        color: #115e59;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
 
@@ -311,8 +325,9 @@
           <div class="brand-mark" aria-hidden="true">R</div>
           <div>
             <p class="brand-name">Roark / Intelligence</p>
-            <h1>STL Part Packing Calculator</h1>
-            <p class="hint">Upload an STL, set the container, and get the fitted count immediately.</p>
+            <div class="variant-badge">A Test - Container Fit Counter</div>
+            <h1>How Many Parts Fit?</h1>
+            <p class="hint">Upload an STL, choose a container size, and get the maximum fitted count immediately.</p>
           </div>
         </div>
         <div class="status" id="status">Loading sample STL...</div>
@@ -320,7 +335,7 @@
 
       <div class="layout">
         <section class="controls" aria-label="Controls">
-          <h2>Input</h2>
+          <h2>A - Container Capacity Input</h2>
 
           <label for="file">STL file</label>
           <input id="file" type="file" accept=".stl,model/stl" />
