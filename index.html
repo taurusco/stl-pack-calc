@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STL Part Packing Calculator</title>
+<title>Roark Intelligence — Part Packing Calculator</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #0e1116; color: #e6edf3; }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
   header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #30363d; }
   header .mark { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #30363d; }
   header .brand { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
@@ -18,33 +18,30 @@
   header .title h1 { margin: 0; font-size: 20px; line-height: 1.15; }
   header .title .sub { margin: 3px 0 0; color: #8b949e; font-size: 13px; }
   @media (max-width: 580px) { header .divider, header .title .sub { display: none; } header { gap: 10px; } }
-  h1 { margin: 0 0 6px; font-size: 24px; }
-  p.sub { margin: 0 0 24px; color: #8b949e; }
   .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  #drop { flex: 1; min-width: 280px; border: 2px dashed #30363d; padding: 28px; text-align: center; cursor: pointer; border-radius: 8px; transition: 0.15s; }
+  #drop { flex: 1; min-width: 280px; border: 2px dashed #30363d; padding: 22px; text-align: center; cursor: pointer; border-radius: 8px; transition: 0.15s; }
   #drop:hover, #drop.over { border-color: #58a6ff; background: #1c2128; }
   #drop strong { font-size: 15px; }
   .info { font-size: 13px; color: #8b949e; }
   .small { font-size: 12px; color: #6e7681; margin-top: 8px; line-height: 1.5; }
-  #preview { width: 100%; height: 320px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; display: block; }
-  label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  input[type=number] { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; width: 140px; font-size: 14px; font-family: inherit; }
-  input[type=number]:focus { outline: none; border-color: #58a6ff; }
-  .containers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  @media (max-width: 640px) { .containers { grid-template-columns: 1fr; } }
-  .container-btn { background: #0d1117; border: 1px solid #30363d; padding: 14px; border-radius: 8px; cursor: pointer; text-align: left; color: inherit; font: inherit; transition: 0.15s; }
-  .container-btn:hover { border-color: #6e7681; }
-  .container-btn.active { border-color: #58a6ff; background: #1f2937; }
-  .container-btn strong { display: block; font-size: 14px; }
-  .container-btn .dim { color: #8b949e; font-size: 12px; margin-top: 4px; }
-  .result-card { background: linear-gradient(180deg, #1f2937 0%, #161b22 100%); border-color: #58a6ff44; }
-  .result { font-size: 44px; font-weight: 700; color: #58a6ff; line-height: 1.1; margin: 4px 0; font-variant-numeric: tabular-nums; }
-  table.bbox { border-collapse: collapse; width: 100%; }
-  table.bbox td { padding: 3px 12px 3px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-  table.bbox td.k { color: #8b949e; width: 130px; }
+  #preview { width: 100%; height: 460px; background: #f3f4f6; border: 1px solid #30363d; border-radius: 8px; display: block; }
+  label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  input[type=number], select { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%; }
+  input[type=number]:focus, select:focus { outline: none; border-color: #58a6ff; }
+  .field { margin-bottom: 12px; }
+  .field-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .demo-btn { background: transparent; color: #58a6ff; border: none; cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; font-family: inherit; }
   .err { color: #f85149; font-size: 13px; }
+  table.spec { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  table.spec td { padding: 6px 10px; font-size: 13px; border-top: 1px solid #1f242c; }
+  table.spec tr:first-child td { border-top: none; }
+  table.spec td.k { color: #8b949e; width: 60%; }
+  table.spec td.v { color: #e6edf3; text-align: right; font-weight: 600; }
+  table.spec tr.section td { background: #1c2128; color: #58a6ff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; padding: 8px 10px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .stack-info { font-size: 12px; color: #6e7681; margin-top: 8px; padding: 10px; background: #0d1117; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -58,7 +55,7 @@
     <div class="divider"></div>
     <div class="title">
       <h1>Part Packing Calculator</h1>
-      <p class="sub">Drop in a .STL part, pick a container, see how many fit. Computed in your browser — files never leave your device.</p>
+      <p class="sub">Drop in a .STL, set quantity per carton, see the packed layout and packaging dimensions.</p>
     </div>
   </header>
 
@@ -70,32 +67,69 @@
     </div>
   </div>
 
-  <div class="row">
-    <div class="card" style="flex:1.4; min-width:320px">
-      <canvas id="preview"></canvas>
-      <div class="small" id="bboxInfo">Load a part to see its bounding box.</div>
+  <div class="layout">
+
+    <div>
+      <div class="card">
+        <div class="field">
+          <label>Calibrate part scale (real height, mm)</label>
+          <input type="number" id="realH" placeholder="leave blank if STL is already mm" step="any" min="0">
+          <div class="small">Used to rescale the file's Z extent to a known real-world height.</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Quantity per carton</label>
+            <input type="number" id="qty" value="50" min="1" step="1">
+          </div>
+          <div class="field">
+            <label>Space between parts (mm)</label>
+            <input type="number" id="gap" value="1" min="0" step="0.1">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Stacking layout</label>
+          <select id="layout">
+            <option value="auto">Compact 3D grid (auto)</option>
+            <option value="1d" selected>Single column (along shortest axis)</option>
+          </select>
+          <div class="small">"Single column" matches typical sheet-metal stacking. "Compact" minimizes the outer box.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="spec" id="specTable">
+          <tr class="section"><td colspan="2">Packaging Size</td></tr>
+          <tr><td class="k">Length (mm)</td><td class="v" id="pkgL">—</td></tr>
+          <tr><td class="k">Width (mm)</td><td class="v" id="pkgW">—</td></tr>
+          <tr><td class="k">Height (mm)</td><td class="v" id="pkgH">—</td></tr>
+          <tr><td class="k">Volume (m³)</td><td class="v" id="pkgVol">—</td></tr>
+          <tr><td class="k">Quantity Per Carton</td><td class="v" id="pkgQty">—</td></tr>
+          <tr><td class="k">Space Between Parts (mm)</td><td class="v" id="pkgGap">—</td></tr>
+          <tr><td class="k">Stacking Grid (X × Y × Z)</td><td class="v" id="pkgGrid">—</td></tr>
+          <tr class="section"><td colspan="2">Part Size</td></tr>
+          <tr><td class="k">Length (mm)</td><td class="v" id="prtL">—</td></tr>
+          <tr><td class="k">Width (mm)</td><td class="v" id="prtW">—</td></tr>
+          <tr><td class="k">Height (mm)</td><td class="v" id="prtH">—</td></tr>
+          <tr><td class="k">Part Volume (cm³)</td><td class="v" id="prtVol">—</td></tr>
+        </table>
+      </div>
     </div>
-    <div class="card" style="flex:1; min-width:240px">
-      <label>Calibrate part scale</label>
-      <p class="info" style="margin:0 0 10px">If your STL isn't already in mm, enter the part's <strong>real height</strong> (Z extent) in mm and we'll rescale.</p>
-      <input type="number" id="realH" placeholder="e.g. 50" step="any" min="0">
-      <span class="info" style="margin-left:8px">mm</span>
-      <div class="small">Leave blank to use the file's native units (most CAD STL = mm).</div>
+
+    <div>
+      <div class="card" style="margin-bottom:0">
+        <canvas id="preview"></canvas>
+        <div class="stack-info" id="stackInfo">Load a part to begin. Bounding box is computed <em>after</em> stacking.</div>
+      </div>
     </div>
+
   </div>
 
   <div class="card">
-    <label>Container</label>
-    <div class="containers" id="containers"></div>
-  </div>
-
-  <div class="card result-card">
-    <div class="info">Parts that fit in this container</div>
-    <div class="result" id="count">—</div>
-    <div class="info" id="grid"></div>
     <div class="small">
-      Method: axis-aligned bounding-box (AABB) grid packing. Counts the maximum identical copies of the part's bounding box that tile inside the container, trying all 6 axis orientations and picking the best.
-      Real packing of <strong>nestable</strong> parts (e.g. a U-channel that slots inside another) can exceed this count; mesh-level nesting requires a different algorithm.
+      Method: parts arranged as axis-aligned bounding boxes; the packaging bbox is then the tight outer box around the arranged stack (parts + inter-part gaps).
+      For nestable parts (e.g. U-channels that slot inside each other) the real-world packaging can be tighter than this AABB stack — capturing that requires mesh-level nesting, which is a future option.
     </div>
   </div>
 </div>
@@ -108,54 +142,39 @@ import * as THREE from 'three';
 import { STLLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-const PRESETS = [
-  { id: 'S', label: 'Small bin',         dims: [200, 200, 200] },
-  { id: 'M', label: 'Medium crate',      dims: [500, 500, 500] },
-  { id: 'L', label: 'Large bin (1m³)',   dims: [1000, 1000, 1000] },
-];
-
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
 const realH = document.getElementById('realH');
-const bboxInfo = document.getElementById('bboxInfo');
-const countEl = document.getElementById('count');
-const gridEl = document.getElementById('grid');
-const containersEl = document.getElementById('containers');
+const qtyInput = document.getElementById('qty');
+const gapInput = document.getElementById('gap');
+const layoutSel = document.getElementById('layout');
+const stackInfo = document.getElementById('stackInfo');
 const demoBtn = document.getElementById('demo');
 
-let activeContainer = PRESETS[2];
+let partGeoRaw = null;
 let rawExtents = null;
 
-PRESETS.forEach(p => {
-  const btn = document.createElement('button');
-  btn.className = 'container-btn' + (p === activeContainer ? ' active' : '');
-  btn.dataset.id = p.id;
-  btn.innerHTML = `<strong>${p.label}</strong><div class="dim">${p.dims[0]} × ${p.dims[1]} × ${p.dims[2]} mm</div>`;
-  btn.onclick = () => {
-    activeContainer = p;
-    document.querySelectorAll('.container-btn').forEach(b => b.classList.toggle('active', b.dataset.id === p.id));
-    recompute();
-  };
-  containersEl.appendChild(btn);
-});
+let instancedMesh = null;
+let bboxLine = null;
+let activeMaterial = null;
+let activeScaledGeo = null;
 
 const canvas = document.getElementById('preview');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setPixelRatio(window.devicePixelRatio);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d1117);
-const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1e6);
-camera.position.set(150, 150, 150);
+scene.background = new THREE.Color(0xf3f4f6);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.001, 1e7);
+camera.position.set(300, 200, 300);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-const dl = new THREE.DirectionalLight(0xffffff, 0.85);
-dl.position.set(1, 1, 1);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dl = new THREE.DirectionalLight(0xffffff, 0.7);
+dl.position.set(1, 1.5, 1);
 scene.add(dl);
-const dl2 = new THREE.DirectionalLight(0xffffff, 0.35);
+const dl2 = new THREE.DirectionalLight(0xffffff, 0.4);
 dl2.position.set(-1, -0.5, -1);
 scene.add(dl2);
-let mesh = null;
 
 function resize() {
   const r = canvas.getBoundingClientRect();
@@ -182,11 +201,12 @@ drop.ondrop = (e) => {
   if (e.dataTransfer.files[0]) loadFromFile(e.dataTransfer.files[0]);
 };
 fileInput.onchange = () => { if (fileInput.files[0]) loadFromFile(fileInput.files[0]); };
-realH.oninput = recompute;
+
+[realH, qtyInput, gapInput, layoutSel].forEach(el => el.addEventListener('input', rebuildPack));
 
 demoBtn.onclick = async (e) => {
   e.stopPropagation();
-  bboxInfo.textContent = 'Loading demo part…';
+  stackInfo.textContent = 'Loading demo part…';
   try {
     const res = await fetch('./base.stl');
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -194,7 +214,7 @@ demoBtn.onclick = async (e) => {
     realH.value = '50';
     loadFromBuffer(buf);
   } catch (err) {
-    bboxInfo.innerHTML = '<span class="err">Demo load failed: ' + err.message + '</span>';
+    stackInfo.innerHTML = '<span class="err">Demo load failed: ' + err.message + '</span>';
   }
 };
 
@@ -208,11 +228,11 @@ function loadFromBuffer(buf) {
   let geo;
   try { geo = loader.parse(buf); }
   catch (err) {
-    bboxInfo.innerHTML = '<span class="err">Failed to parse STL: ' + err.message + '</span>';
+    stackInfo.innerHTML = '<span class="err">Failed to parse STL: ' + err.message + '</span>';
     return;
   }
 
-  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  if (partGeoRaw) partGeoRaw.dispose();
   geo.computeBoundingBox();
   const bb = geo.boundingBox;
   const size = new THREE.Vector3().subVectors(bb.max, bb.min);
@@ -220,58 +240,144 @@ function loadFromBuffer(buf) {
 
   const center = new THREE.Vector3().addVectors(bb.max, bb.min).multiplyScalar(0.5);
   geo.translate(-center.x, -center.y, -center.z);
-  const mat = new THREE.MeshPhongMaterial({ color: 0x9ba3af, flatShading: true, specular: 0x222222 });
-  mesh = new THREE.Mesh(geo, mat);
-  scene.add(mesh);
+  geo.computeVertexNormals();
+  partGeoRaw = geo;
 
-  const r = Math.max(size.x, size.y, size.z) * 1.8;
-  camera.position.set(r, r * 0.8, r);
-  controls.target.set(0, 0, 0);
-  controls.update();
-
-  recompute();
+  rebuildPack();
 }
 
-function recompute() {
-  if (!rawExtents) return;
-  let [w, d, h] = rawExtents;
-  let scale = 1;
+// Pick (nx, ny, nz) for a compact 3D arrangement of N AABBs of dims (a,b,c).
+// Aim: minimize the longest side of the resulting cuboid, with nx*ny*nz >= N.
+function compactGrid(N, a, b, c) {
+  let best = null;
+  const upper = Math.ceil(Math.cbrt(N)) + 2;
+  for (let nx = 1; nx <= upper * 4; nx++) {
+    for (let ny = 1; ny <= upper * 4; ny++) {
+      const nz = Math.ceil(N / (nx * ny));
+      if (nz < 1) continue;
+      if (nx * ny * nz < N) continue;
+      const lx = nx * a, ly = ny * b, lz = nz * c;
+      const longest = Math.max(lx, ly, lz);
+      const slack = nx * ny * nz - N;
+      const score = longest + slack * Math.min(a, b, c) * 0.1;
+      if (!best || score < best.score) best = { nx, ny, nz, score };
+      if (nx * ny >= N) break;
+    }
+  }
+  return best;
+}
+
+function rebuildPack() {
+  if (!partGeoRaw || !rawExtents) return;
+
   const realHval = parseFloat(realH.value);
-  if (!isNaN(realHval) && realHval > 0) scale = realHval / h;
-  w *= scale; d *= scale; h *= scale;
+  const scale = (!isNaN(realHval) && realHval > 0) ? realHval / rawExtents[2] : 1;
+  const N = Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1));
+  const gap = Math.max(0, parseFloat(gapInput.value) || 0);
+  const mode = layoutSel.value;
 
-  const [cw, cd, ch] = activeContainer.dims;
+  const w = rawExtents[0] * scale;
+  const d = rawExtents[1] * scale;
+  const h = rawExtents[2] * scale;
   const dims = [w, d, h];
-  const labels = ['X', 'Y', 'Z'];
-  let best = { n: 0, perm: null, abc: null };
-  const perms = [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
-  for (const p of perms) {
-    const a = dims[p[0]], b = dims[p[1]], c = dims[p[2]];
-    if (a > cw || b > cd || c > ch) continue;
-    const n = Math.floor(cw/a) * Math.floor(cd/b) * Math.floor(ch/c);
-    if (n > best.n) best = { n, perm: p, abc: [a,b,c] };
+
+  // Decide grid: nx * ny * nz >= N
+  let nx = 1, ny = 1, nz = 1;
+  let stackAxisLabel = '';
+  if (mode === '1d') {
+    const idx = [0, 1, 2].sort((a, b) => dims[a] - dims[b])[0];
+    if (idx === 0) { nx = N; stackAxisLabel = 'X (smallest)'; }
+    else if (idx === 1) { ny = N; stackAxisLabel = 'Y (smallest)'; }
+    else { nz = N; stackAxisLabel = 'Z (smallest)'; }
+  } else {
+    const g = compactGrid(N, w + gap, d + gap, h + gap);
+    nx = g.nx; ny = g.ny; nz = g.nz;
+    stackAxisLabel = '3D';
   }
 
-  bboxInfo.innerHTML = `
-    <table class="bbox">
-      <tr><td class="k">STL extents (raw):</td><td>${rawExtents.map(x=>x.toFixed(3)).join(' × ')}</td></tr>
-      <tr><td class="k">Scale factor:</td><td>${scale.toFixed(4)} ${scale === 1 ? '(no rescale)' : 'mm/unit'}</td></tr>
-      <tr><td class="k">Part bbox (mm):</td><td>${w.toFixed(2)} × ${d.toFixed(2)} × ${h.toFixed(2)}</td></tr>
-      <tr><td class="k">Part bbox volume:</td><td>${(w*d*h).toLocaleString(undefined,{maximumFractionDigits:0})} mm³ &nbsp; (${(w*d*h/1000).toFixed(2)} cm³)</td></tr>
-    </table>`;
+  // Stack bbox dimensions (parts + interior gaps; no exterior padding)
+  const stackW = nx * w + Math.max(0, nx - 1) * gap;
+  const stackD = ny * d + Math.max(0, ny - 1) * gap;
+  const stackH = nz * h + Math.max(0, nz - 1) * gap;
 
-  if (best.n === 0) {
-    countEl.textContent = '0';
-    gridEl.textContent = 'Part is larger than the container in at least one orientation.';
-    return;
+  // Tear down previous instances
+  if (instancedMesh) { scene.remove(instancedMesh); instancedMesh.dispose(); instancedMesh = null; }
+  if (bboxLine) { scene.remove(bboxLine); bboxLine.geometry.dispose(); bboxLine.material.dispose(); bboxLine = null; }
+  if (activeScaledGeo) { activeScaledGeo.dispose(); activeScaledGeo = null; }
+  if (activeMaterial) { activeMaterial.dispose(); activeMaterial = null; }
+
+  // Scaled geometry
+  activeScaledGeo = partGeoRaw.clone();
+  activeScaledGeo.scale(scale, scale, scale);
+  activeMaterial = new THREE.MeshPhongMaterial({ color: 0x4a4d52, flatShading: false, specular: 0x111111, shininess: 25 });
+
+  // Total instances actually rendered = filled cells of nx*ny*nz up to N
+  instancedMesh = new THREE.InstancedMesh(activeScaledGeo, activeMaterial, N);
+  const dummy = new THREE.Object3D();
+  let placed = 0;
+  outer:
+  for (let iz = 0; iz < nz; iz++) {
+    for (let iy = 0; iy < ny; iy++) {
+      for (let ix = 0; ix < nx; ix++) {
+        if (placed >= N) break outer;
+        const x = -stackW / 2 + w / 2 + ix * (w + gap);
+        const y = -stackD / 2 + d / 2 + iy * (d + gap);
+        const z = -stackH / 2 + h / 2 + iz * (h + gap);
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        instancedMesh.setMatrixAt(placed, dummy.matrix);
+        placed++;
+      }
+    }
   }
+  instancedMesh.count = placed;
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  scene.add(instancedMesh);
 
-  const [a,b,c] = best.abc;
-  const nA = Math.floor(cw/a), nB = Math.floor(cd/b), nC = Math.floor(ch/c);
-  const fill = (best.n * w*d*h) / (cw*cd*ch) * 100;
-  countEl.textContent = best.n.toLocaleString();
-  const orient = best.perm.map(i => labels[i]).join(' / ');
-  gridEl.innerHTML = `Grid: <strong>${nA} × ${nB} × ${nC}</strong> &nbsp;·&nbsp; orientation ${orient} &nbsp;·&nbsp; bbox fill ${fill.toFixed(1)}%`;
+  // Wireframe bounding box around the stack (computed AFTER stacking)
+  const boxGeo = new THREE.BoxGeometry(stackW, stackD, stackH);
+  const edges = new THREE.EdgesGeometry(boxGeo);
+  bboxLine = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x4f6df6, linewidth: 2 }));
+  scene.add(bboxLine);
+  boxGeo.dispose();
+
+  // Camera fit
+  const longest = Math.max(stackW, stackD, stackH);
+  const r = longest * 1.6;
+  camera.near = Math.max(0.001, longest / 1000);
+  camera.far = longest * 100;
+  camera.position.set(r * 1.2, r * 0.85, r * 1.2);
+  controls.target.set(0, 0, 0);
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  // Sort dims for L/W/H labels
+  const partSorted = [...dims].sort((a, b) => b - a);
+  const pkgSorted = [stackW, stackD, stackH].sort((a, b) => b - a);
+
+  document.getElementById('prtL').textContent = partSorted[0].toFixed(1);
+  document.getElementById('prtW').textContent = partSorted[1].toFixed(1);
+  document.getElementById('prtH').textContent = partSorted[2].toFixed(1);
+  document.getElementById('prtVol').textContent = (w * d * h / 1000).toFixed(2);
+
+  document.getElementById('pkgL').textContent = pkgSorted[0].toFixed(1);
+  document.getElementById('pkgW').textContent = pkgSorted[1].toFixed(1);
+  document.getElementById('pkgH').textContent = pkgSorted[2].toFixed(1);
+  document.getElementById('pkgVol').textContent = (stackW * stackD * stackH / 1e9).toFixed(4);
+  document.getElementById('pkgQty').textContent = N.toLocaleString();
+  document.getElementById('pkgGap').textContent = gap;
+  document.getElementById('pkgGrid').textContent = `${nx} × ${ny} × ${nz}`;
+
+  const partVol = w * d * h;
+  const stackVol = stackW * stackD * stackH;
+  const bboxFill = (N * partVol) / stackVol * 100;
+  stackInfo.innerHTML = `
+    <strong>${N.toLocaleString()}</strong> parts arranged as <strong>${nx} × ${ny} × ${nz}</strong> · stacking ${stackAxisLabel} ·
+    bounding box <strong>${stackW.toFixed(1)} × ${stackD.toFixed(1)} × ${stackH.toFixed(1)} mm</strong> ·
+    bbox fill <strong>${bboxFill.toFixed(1)}%</strong>
+  `;
 }
 </script>
 </body>
