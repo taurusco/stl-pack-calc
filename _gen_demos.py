@@ -107,9 +107,9 @@ if __name__ == "__main__":
         os.path.join(here, "tray.stl"),
         L_bot=100, W_bot=60, L_top=160, W_top=120, H=60, t=3,
     )
-    # Beam: elongated sheet-metal trough (only tapers in the cross-section width).
-    # Pitch ≈ 8 mm in the height direction.
+    # Beam: elongated sheet-metal trough. Tapered in both length and width so it
+    # genuinely nests by pure translation along its height. ~8 mm pitch.
     make_tapered_tote(
         os.path.join(here, "beam.stl"),
-        L_bot=600, W_bot=60, L_top=600, W_top=120, H=40, t=3,
+        L_bot=600, W_bot=40, L_top=750, W_top=100, H=40, t=3,
     )
