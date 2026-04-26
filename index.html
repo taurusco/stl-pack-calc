@@ -129,8 +129,8 @@
 
   <div class="card">
     <div class="small">
-      Method: parts arranged as axis-aligned bounding boxes; the packaging bbox is then the tight outer box around the arranged stack (parts + inter-part gaps).
-      For nestable parts (e.g. U-channels that slot inside each other) the real-world packaging can be tighter than this AABB stack — capturing that requires mesh-level nesting, which is a future option.
+      <strong>Mesh nesting</strong> (default) uses BVH-accelerated triangle-mesh collision to find the smallest pure-translation stride along each axis with no part-to-part overlap, then picks the tightest axis. This catches U-channels, cups, and trays that slot into themselves. Some parts (closed brackets, solids) don't nest by translation — the tool will report this honestly and the result will match AABB.<br><br>
+      <strong>Currently not modeled:</strong> alternating 180° flips between adjacent parts (common in real sheet-metal packaging), rotational nesting, and multi-axis offsets. These can yield additional density beyond pure translation.
     </div>
   </div>
 </div>
@@ -489,7 +489,16 @@ function rebuildPack() {
   if (mode === 'nest' && nestingComputing) {
     extra = ' · <em style="color:#d2a8ff">computing dense nesting stride…</em>';
   } else if (mode === 'nest' && nestingResult && !nestingResult.error && modeUsed === 'nest') {
-    extra = ` · stride <strong>${nestStride.toFixed(2)} mm</strong> (vs AABB ${[w,d,h][nestAxisIdx].toFixed(2)} mm — <strong>${(([w,d,h][nestAxisIdx]/nestStride)).toFixed(1)}× tighter</strong>)`;
+    const aabbExt = [w, d, h][nestAxisIdx];
+    const ratio = aabbExt / nestStride;
+    const savePct = (1 - nestStride / aabbExt) * 100;
+    let nestNote;
+    if (savePct < 5) {
+      nestNote = `<span style="color:#d2a8ff">this part doesn't nest by translation</span> (stride ${nestStride.toFixed(2)} mm ≈ AABB ${aabbExt.toFixed(2)} mm)`;
+    } else {
+      nestNote = `stride <strong>${nestStride.toFixed(2)} mm</strong> vs AABB ${aabbExt.toFixed(2)} mm — <strong>${ratio.toFixed(2)}× tighter</strong> (saves ${savePct.toFixed(0)}%)`;
+    }
+    extra = ` · ${nestNote}`;
   } else if (mode === 'nest' && nestingResult && nestingResult.error) {
     extra = ` · <span class="err">nesting failed: ${nestingResult.error}; using AABB</span>`;
   }
