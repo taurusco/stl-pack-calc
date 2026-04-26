@@ -89,6 +89,12 @@
         </div>
 
         <div class="field">
+          <label>Unit weight (kg, optional)</label>
+          <input type="number" id="unitWeight" placeholder="e.g. 3.6" step="any" min="0">
+          <div class="small">Used to compute total carton weight.</div>
+        </div>
+
+        <div class="field">
           <label>Stacking layout</label>
           <select id="layout">
             <option value="auto-best" selected>Auto — pick the densest mode</option>
@@ -111,6 +117,9 @@
           <tr><td class="k">Quantity Per Carton</td><td class="v" id="pkgQty">—</td></tr>
           <tr><td class="k">Space Between Parts (mm)</td><td class="v" id="pkgGap">—</td></tr>
           <tr><td class="k">Stacking Grid (X × Y × Z)</td><td class="v" id="pkgGrid">—</td></tr>
+          <tr id="rowUnitWeight" hidden><td class="k">Unit Weight (kg)</td><td class="v" id="pkgUnitWeight">—</td></tr>
+          <tr id="rowTotalWeight" hidden><td class="k">Total Weight of Box (kg)</td><td class="v" id="pkgTotalWeight">—</td></tr>
+          <tr id="rowVolWeight" hidden><td class="k">Volumetric Weight (kg)</td><td class="v" id="pkgVolWeight">—</td></tr>
           <tr class="section"><td colspan="2">Part Size</td></tr>
           <tr><td class="k">Length (mm)</td><td class="v" id="prtL">—</td></tr>
           <tr><td class="k">Width (mm)</td><td class="v" id="prtW">—</td></tr>
@@ -165,8 +174,8 @@ const realH = document.getElementById('realH');
 const qtyInput = document.getElementById('qty');
 const gapInput = document.getElementById('gap');
 const layoutSel = document.getElementById('layout');
+const unitWeightInput = document.getElementById('unitWeight');
 const stackInfo = document.getElementById('stackInfo');
-const demoBtn = document.getElementById('demo');
 
 let partGeoRaw = null;
 let rawExtents = null;
@@ -224,7 +233,7 @@ drop.ondrop = (e) => {
 };
 fileInput.onchange = () => { if (fileInput.files[0]) loadFromFile(fileInput.files[0]); };
 
-[realH, qtyInput, gapInput, layoutSel].forEach(el => el.addEventListener('input', rebuildPack));
+[realH, qtyInput, gapInput, layoutSel, unitWeightInput].forEach(el => el.addEventListener('input', rebuildPack));
 
 const DEMOS = {
   tray: { url: './tray.stl', realH: '' },
@@ -576,10 +585,24 @@ function rebuildPack() {
   document.getElementById('pkgL').textContent = pkgSorted[0].toFixed(1);
   document.getElementById('pkgW').textContent = pkgSorted[1].toFixed(1);
   document.getElementById('pkgH').textContent = pkgSorted[2].toFixed(1);
-  document.getElementById('pkgVol').textContent = (stackW * stackD * stackH / 1e9).toFixed(4);
+  const pkgVolM3 = stackW * stackD * stackH / 1e9;
+  document.getElementById('pkgVol').textContent = pkgVolM3.toFixed(4);
   document.getElementById('pkgQty').textContent = N.toLocaleString();
   document.getElementById('pkgGap').textContent = gap;
   document.getElementById('pkgGrid').textContent = `${nx} × ${ny} × ${nz}`;
+
+  // Optional weight rows — only show if user provided unit weight
+  const unitW = parseFloat(unitWeightInput.value);
+  const showW = !isNaN(unitW) && unitW > 0;
+  document.getElementById('rowUnitWeight').hidden = !showW;
+  document.getElementById('rowTotalWeight').hidden = !showW;
+  document.getElementById('rowVolWeight').hidden = !showW;
+  if (showW) {
+    document.getElementById('pkgUnitWeight').textContent = unitW.toFixed(3);
+    document.getElementById('pkgTotalWeight').textContent = (unitW * N).toFixed(2);
+    // Standard international air-freight dim factor: 167 kg/m³
+    document.getElementById('pkgVolWeight').textContent = (pkgVolM3 * 167).toFixed(2);
+  }
 
   const stackVol = stackW * stackD * stackH;
   const aabbBaseline = aabb1DPlan();
