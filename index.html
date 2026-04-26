@@ -693,12 +693,18 @@
         const box = new THREE.Box3().setFromObject(target);
         const sphere = box.getBoundingSphere(new THREE.Sphere());
         const radius = Math.max(sphere.radius, 1);
-        const distance = radius / Math.sin((camera.fov * Math.PI) / 360);
-        camera.position.set(distance * 0.72, distance * 0.54, distance * 0.82);
-        camera.near = Math.max(radius / 1000, 0.001);
-        camera.far = distance * 10;
+        const center = sphere.center;
+        const distance = viewerMode === "packed" ? radius * 4.8 : radius * 3.2;
+        camera.position.set(
+          center.x + distance * 0.78,
+          center.y + distance * 0.58,
+          center.z + distance * 0.92,
+        );
+        camera.near = Math.max(radius / 2000, 0.001);
+        camera.far = distance * 12;
+        camera.lookAt(center);
         camera.updateProjectionMatrix();
-        controls.target.set(0, 0, 0);
+        controls.target.copy(center);
         controls.update();
       }
 
