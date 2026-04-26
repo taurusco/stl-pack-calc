@@ -9,10 +9,15 @@
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #0e1116; color: #e6edf3; }
   .wrap { max-width: 1040px; margin: 0 auto; padding: 24px; }
-  header { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #30363d; }
-  header img { height: 38px; width: auto; flex-shrink: 0; }
-  header .title h1 { margin: 0; font-size: 22px; line-height: 1.1; }
-  header .title .sub { margin: 2px 0 0; color: #8b949e; font-size: 13px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #30363d; }
+  header .mark { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #30363d; }
+  header .brand { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  header .brand .name { font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: #e6edf3; text-transform: uppercase; }
+  header .brand .tag { font-size: 11px; letter-spacing: 0.12em; color: #6e7681; text-transform: uppercase; }
+  header .divider { width: 1px; align-self: stretch; background: #30363d; margin: 0 6px; }
+  header .title h1 { margin: 0; font-size: 20px; line-height: 1.15; }
+  header .title .sub { margin: 3px 0 0; color: #8b949e; font-size: 13px; }
+  @media (max-width: 580px) { header .divider, header .title .sub { display: none; } header { gap: 10px; } }
   h1 { margin: 0 0 6px; font-size: 24px; }
   p.sub { margin: 0 0 24px; color: #8b949e; }
   .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
@@ -45,7 +50,12 @@
 <body>
 <div class="wrap">
   <header>
-    <img src="./komaspec-logo.svg" alt="Komaspec">
+    <img class="mark" src="./roark.jpg" alt="Roark Intelligence">
+    <div class="brand">
+      <div class="name">Roark</div>
+      <div class="tag">Intelligence</div>
+    </div>
+    <div class="divider"></div>
     <div class="title">
       <h1>Part Packing Calculator</h1>
       <p class="sub">Drop in a .STL part, pick a container, see how many fit. Computed in your browser — files never leave your device.</p>
