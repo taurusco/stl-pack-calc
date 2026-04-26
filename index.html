@@ -390,7 +390,7 @@ function rebuildPack() {
 
   const realHval = parseFloat(realH.value);
   const scale = (!isNaN(realHval) && realHval > 0) ? realHval / rawExtents[2] : 1;
-  const N = Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1));
+  const N = Math.min(5000, Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1)));
   const gap = Math.max(0, parseFloat(gapInput.value) || 0);
   const mode = layoutSel.value;
 
