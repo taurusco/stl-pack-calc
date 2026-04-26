@@ -1,631 +1,919 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roark Intelligence — Part Packing Calculator</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #0e1116; color: #e6edf3; }
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #30363d; }
-  header .mark { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #30363d; }
-  header .brand { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
-  header .brand .name { font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: #e6edf3; text-transform: uppercase; }
-  header .brand .tag { font-size: 11px; letter-spacing: 0.12em; color: #6e7681; text-transform: uppercase; }
-  header .divider { width: 1px; align-self: stretch; background: #30363d; margin: 0 6px; }
-  header .title h1 { margin: 0; font-size: 20px; line-height: 1.15; }
-  header .title .sub { margin: 3px 0 0; color: #8b949e; font-size: 13px; }
-  @media (max-width: 580px) { header .divider, header .title .sub { display: none; } header { gap: 10px; } }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-  .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  #drop { flex: 1; min-width: 280px; border: 2px dashed #30363d; padding: 22px; text-align: center; cursor: pointer; border-radius: 8px; transition: 0.15s; }
-  #drop:hover, #drop.over { border-color: #58a6ff; background: #1c2128; }
-  #drop strong { font-size: 15px; }
-  .info { font-size: 13px; color: #8b949e; }
-  .small { font-size: 12px; color: #6e7681; margin-top: 8px; line-height: 1.5; }
-  #preview { width: 100%; height: 460px; background: #f3f4f6; border: 1px solid #30363d; border-radius: 8px; display: block; }
-  label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
-  input[type=number], select { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%; }
-  input[type=number]:focus, select:focus { outline: none; border-color: #58a6ff; }
-  .field { margin-bottom: 12px; }
-  .field-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .demo-btn { background: transparent; color: #58a6ff; border: none; cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; font-family: inherit; }
-  .err { color: #f85149; font-size: 13px; }
-  table.spec { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-  table.spec td { padding: 6px 10px; font-size: 13px; border-top: 1px solid #1f242c; }
-  table.spec tr:first-child td { border-top: none; }
-  table.spec td.k { color: #8b949e; width: 60%; }
-  table.spec td.v { color: #e6edf3; text-align: right; font-weight: 600; }
-  table.spec tr.section td { background: #1c2128; color: #58a6ff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; padding: 8px 10px; }
-  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
-  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
-  .stack-info { font-size: 12px; color: #6e7681; margin-top: 8px; padding: 10px; background: #0d1117; border-radius: 6px; }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <img class="mark" src="./roark.jpg" alt="Roark Intelligence">
-    <div class="brand">
-      <div class="name">Roark</div>
-      <div class="tag">Intelligence</div>
-    </div>
-    <div class="divider"></div>
-    <div class="title">
-      <h1>Part Packing Calculator</h1>
-      <p class="sub">Drop in a .STL, set quantity per carton, see the packed layout and packaging dimensions.</p>
-    </div>
-  </header>
-
-  <div class="card">
-    <div id="drop">
-      <div><strong>Drop your .STL here</strong></div>
-      <div class="info">or click to choose a file &nbsp;·&nbsp; demos: <button class="demo-btn" data-demo="tray">tapered tote</button> &nbsp;·&nbsp; <button class="demo-btn" data-demo="beam">tapered beam</button> &nbsp;·&nbsp; <button class="demo-btn" data-demo="base">closed bracket</button></div>
-      <input type="file" id="file" accept=".stl,.STL" hidden>
-    </div>
-  </div>
-
-  <div class="layout">
-
-    <div>
-      <div class="card">
-        <div class="field">
-          <label>Calibrate part scale (real height, mm)</label>
-          <input type="number" id="realH" placeholder="leave blank if STL is already mm" step="any" min="0">
-          <div class="small">Used to rescale the file's Z extent to a known real-world height.</div>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label>Quantity per carton</label>
-            <input type="number" id="qty" value="50" min="1" step="1">
-          </div>
-          <div class="field">
-            <label>Space between parts (mm)</label>
-            <input type="number" id="gap" value="1" min="0" step="0.1">
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Unit weight (kg, optional)</label>
-          <input type="number" id="unitWeight" placeholder="e.g. 3.6" step="any" min="0">
-          <div class="small">Used to compute total carton weight.</div>
-        </div>
-
-        <div class="field">
-          <label>Stacking layout</label>
-          <select id="layout">
-            <option value="auto-best" selected>Auto — pick the densest mode</option>
-            <option value="nest">Mesh nesting (translation only)</option>
-            <option value="nest-flip">Mesh nesting (alternating 180° flip)</option>
-            <option value="1d">AABB single column (shortest axis)</option>
-            <option value="auto">AABB compact 3D grid</option>
-          </select>
-          <div class="small">"Auto" tries every mode and picks whichever gives the smallest packaging volume. "Translation" slides identical parts together; "alternating flip" rotates every other part 180° to mate open mouths.</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <table class="spec" id="specTable">
-          <tr class="section"><td colspan="2">Packaging Size</td></tr>
-          <tr><td class="k">Length (mm)</td><td class="v" id="pkgL">—</td></tr>
-          <tr><td class="k">Width (mm)</td><td class="v" id="pkgW">—</td></tr>
-          <tr><td class="k">Height (mm)</td><td class="v" id="pkgH">—</td></tr>
-          <tr><td class="k">Volume (m³)</td><td class="v" id="pkgVol">—</td></tr>
-          <tr><td class="k">Quantity Per Carton</td><td class="v" id="pkgQty">—</td></tr>
-          <tr><td class="k">Space Between Parts (mm)</td><td class="v" id="pkgGap">—</td></tr>
-          <tr><td class="k">Stacking Grid (X × Y × Z)</td><td class="v" id="pkgGrid">—</td></tr>
-          <tr id="rowUnitWeight" hidden><td class="k">Unit Weight (kg)</td><td class="v" id="pkgUnitWeight">—</td></tr>
-          <tr id="rowTotalWeight" hidden><td class="k">Total Weight of Box (kg)</td><td class="v" id="pkgTotalWeight">—</td></tr>
-          <tr id="rowVolWeight" hidden><td class="k">Volumetric Weight (kg)</td><td class="v" id="pkgVolWeight">—</td></tr>
-          <tr class="section"><td colspan="2">Part Size</td></tr>
-          <tr><td class="k">Length (mm)</td><td class="v" id="prtL">—</td></tr>
-          <tr><td class="k">Width (mm)</td><td class="v" id="prtW">—</td></tr>
-          <tr><td class="k">Height (mm)</td><td class="v" id="prtH">—</td></tr>
-          <tr><td class="k">Part Volume (cm³)</td><td class="v" id="prtVol">—</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div>
-      <div class="card" style="margin-bottom:0">
-        <canvas id="preview"></canvas>
-        <div class="stack-info" id="stackInfo">Load a part to begin. Bounding box is computed <em>after</em> stacking.</div>
-      </div>
-    </div>
-
-  </div>
-
-  <div class="card">
-    <div class="small">
-      <strong>How it works.</strong> The tool tries four packing strategies and shows the densest result:
-      <ol style="margin:6px 0 0; padding-left:22px">
-        <li><strong>AABB column</strong> — stack identical bounding boxes along the part's shortest axis.</li>
-        <li><strong>AABB 3D grid</strong> — pick the (n<sub>x</sub>, n<sub>y</sub>, n<sub>z</sub>) layout that minimizes the longest outer side.</li>
-        <li><strong>Mesh nesting (translation)</strong> — BVH-accelerated triangle-mesh collision, binary-searches the smallest non-overlap offset on each axis. Catches cups, U-channels, and trays that slot into themselves.</li>
-        <li><strong>Mesh nesting (alternating flip)</strong> — every second part rotated 180° around one axis. Mating opposite orientations works well for trapezoidal sheet-metal profiles, Z-sections, and other parts that don't nest by pure translation.</li>
-      </ol>
-      Some parts (closed brackets, fully solid blocks) don't nest at all — the tool falls back to AABB and reports that honestly.<br><br>
-      <strong>Not yet modeled:</strong> rotational nesting (continuous rotation rather than 180° flip), multi-axis offsets, mesh-vs-mesh interlocking. These could squeeze a bit more density on certain parts.
-    </div>
-  </div>
-</div>
-
-<script type="importmap">
-{ "imports": {
-  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-  "three/": "https://unpkg.com/three@0.160.0/"
-} }
-</script>
-<script type="module">
-import * as THREE from 'three';
-import { STLLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/STLLoader.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-import { computeBoundsTree, disposeBoundsTree } from 'https://unpkg.com/three-mesh-bvh@0.7.8/build/index.module.js';
-
-THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
-THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
-
-const drop = document.getElementById('drop');
-const fileInput = document.getElementById('file');
-const realH = document.getElementById('realH');
-const qtyInput = document.getElementById('qty');
-const gapInput = document.getElementById('gap');
-const layoutSel = document.getElementById('layout');
-const unitWeightInput = document.getElementById('unitWeight');
-const stackInfo = document.getElementById('stackInfo');
-
-let partGeoRaw = null;
-let rawExtents = null;
-let cameraInitialized = false;
-let lastFitDims = null;         // [stackW, stackD, stackH] of the last camera-fit pack
-let nestingResult = null;       // { strides: [sx, sy, sz] } in raw STL units
-let nestingComputing = false;
-let nestingGen = 0;             // bumped on each loadFromBuffer; stale computes abort
-
-let instancedMesh = null;
-let bboxLine = null;
-let activeMaterial = null;
-let activeScaledGeo = null;
-
-const canvas = document.getElementById('preview');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(window.devicePixelRatio);
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf3f4f6);
-const camera = new THREE.PerspectiveCamera(35, 1, 0.001, 1e7);
-camera.position.set(300, 200, 300);
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dl = new THREE.DirectionalLight(0xffffff, 0.7);
-dl.position.set(1, 1.5, 1);
-scene.add(dl);
-const dl2 = new THREE.DirectionalLight(0xffffff, 0.4);
-dl2.position.set(-1, -0.5, -1);
-scene.add(dl2);
-
-function resize() {
-  const r = canvas.getBoundingClientRect();
-  if (r.width === 0) return;
-  renderer.setSize(r.width, r.height, false);
-  camera.aspect = r.width / r.height;
-  camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', resize);
-resize();
-
-(function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
-})();
-
-drop.onclick = (e) => { if (!e.target.classList.contains('demo-btn')) fileInput.click(); };
-drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
-drop.ondragleave = () => drop.classList.remove('over');
-drop.ondrop = (e) => {
-  e.preventDefault();
-  drop.classList.remove('over');
-  if (e.dataTransfer.files[0]) loadFromFile(e.dataTransfer.files[0]);
-};
-fileInput.onchange = () => { if (fileInput.files[0]) loadFromFile(fileInput.files[0]); };
-
-[realH, qtyInput, gapInput, layoutSel, unitWeightInput].forEach(el => el.addEventListener('input', rebuildPack));
-
-const DEMOS = {
-  tray: { url: './tray.stl', realH: '' },
-  beam: { url: './beam.stl', realH: '' },
-  base: { url: './base.stl', realH: '50' },
-};
-
-async function loadDemo(name) {
-  const d = DEMOS[name];
-  if (!d) return;
-  stackInfo.textContent = `Loading demo: ${name}…`;
-  try {
-    // Cache-bust so newly-deployed demo files always come through fresh
-    const url = d.url + (d.url.includes('?') ? '&' : '?') + 'v=' + Date.now();
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const buf = await res.arrayBuffer();
-    realH.value = d.realH;
-    loadFromBuffer(buf);
-  } catch (err) {
-    stackInfo.innerHTML = '<span class="err">Demo load failed: ' + err.message + '</span>';
-  }
-}
-
-document.querySelectorAll('.demo-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    loadDemo(btn.dataset.demo);
-  });
-});
-
-// Auto-load the tray demo on first paint so the page never looks empty
-window.addEventListener('load', () => loadDemo('tray'));
-
-async function loadFromFile(file) {
-  const buf = await file.arrayBuffer();
-  loadFromBuffer(buf);
-}
-
-function loadFromBuffer(buf) {
-  const loader = new STLLoader();
-  let geo;
-  try { geo = loader.parse(buf); }
-  catch (err) {
-    stackInfo.innerHTML = '<span class="err">Failed to parse STL: ' + err.message + '</span>';
-    return;
-  }
-
-  if (partGeoRaw) {
-    if (partGeoRaw.boundsTree) partGeoRaw.disposeBoundsTree();
-    partGeoRaw.dispose();
-  }
-  cameraInitialized = false;
-  nestingResult = null;
-  nestingGen++;                 // any inflight nesting compute will see a stale gen and abort
-  geo.computeBoundingBox();
-  const bb = geo.boundingBox;
-  const size = new THREE.Vector3().subVectors(bb.max, bb.min);
-  rawExtents = [size.x, size.y, size.z];
-
-  const center = new THREE.Vector3().addVectors(bb.max, bb.min).multiplyScalar(0.5);
-  geo.translate(-center.x, -center.y, -center.z);
-  geo.computeVertexNormals();
-  partGeoRaw = geo;
-
-  rebuildPack();
-  // Kick off nesting computation in the background
-  computeNesting();
-}
-
-async function computeNesting() {
-  const myGen = nestingGen;
-  const localGeo = partGeoRaw;
-  if (!localGeo) return;
-  nestingComputing = true;
-  await new Promise(r => setTimeout(r, 30));   // let the UI paint "computing" state
-  if (myGen !== nestingGen) { nestingComputing = false; return; }
-  try {
-    localGeo.computeBoundsTree();
-    const [w, d, h] = rawExtents;
-    const partExtents = [w, d, h];
-
-    // Pure translation strides: 3 axes
-    const strides = [
-      findStride(localGeo, 0, w, null),
-      findStride(localGeo, 1, d, null),
-      findStride(localGeo, 2, h, null),
-    ];
-    if (myGen !== nestingGen) { nestingComputing = false; return; }
-
-    // Alternating-flip strides: 3 stack × 2 flip = 6 combinations
-    const flipStrides = [];
-    for (let stack = 0; stack < 3; stack++) {
-      for (let flip = 0; flip < 3; flip++) {
-        if (flip === stack) continue;
-        const s = findStride(localGeo, stack, partExtents[stack], flip);
-        flipStrides.push({ stack, flip, stride: s });
-        if (myGen !== nestingGen) { nestingComputing = false; return; }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STL Fit Calculator</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17202a;
+        --muted: #667085;
+        --line: #d9dee7;
+        --surface: #ffffff;
+        --panel: #f5f7fb;
+        --accent: #0f766e;
+        --accent-strong: #0b5f59;
+        --warn: #9a3412;
       }
-    }
 
-    if (myGen !== nestingGen) { nestingComputing = false; return; }
-    nestingResult = { strides, flipStrides };
-  } catch (err) {
-    console.error('Nesting failed:', err);
-    if (myGen === nestingGen) nestingResult = { error: err.message };
-  } finally {
-    nestingComputing = false;
-    if (myGen === nestingGen) {
-      cameraInitialized = false;   // Force a refit so the post-nesting bbox shows up sized correctly
-      rebuildPack();
-    }
-  }
-}
-
-function intersectsAt(geo, axis, offset, flipAxis) {
-  // Test whether `geo` (at origin) intersects a copy of `geo` translated by `offset` along
-  // `axis`, optionally rotated 180° around `flipAxis` first. flipAxis === null → no flip.
-  const m = new THREE.Matrix4();
-  if (flipAxis === 0)      m.makeRotationX(Math.PI);
-  else if (flipAxis === 1) m.makeRotationY(Math.PI);
-  else if (flipAxis === 2) m.makeRotationZ(Math.PI);
-  else                     m.identity();
-  const pos = new THREE.Vector3(0, 0, 0);
-  pos.setComponent(axis, offset);
-  m.setPosition(pos);
-  return geo.boundsTree.intersectsGeometry(geo, m);
-}
-
-function findStride(geo, axis, partExtent, flipAxis) {
-  // Smallest offset along `axis` (≥ 0) at which a copy doesn't intersect.
-  // With flipAxis !== null, the copy is also flipped 180° around that axis.
-  // Search range: [0, 2 × partExtent] to handle cases where flipping shifts the silhouette.
-  const upper = partExtent * 2 + 1;
-  if (intersectsAt(geo, axis, upper, flipAxis)) return upper;   // bail out
-  let lo = 0, hi = upper;
-  // Make sure offset 0 overlaps. If not, return 0 immediately.
-  if (!intersectsAt(geo, axis, 0, flipAxis)) return 0;
-  for (let i = 0; i < 22; i++) {
-    const mid = (lo + hi) / 2;
-    if (intersectsAt(geo, axis, mid, flipAxis)) lo = mid;
-    else hi = mid;
-  }
-  return hi;
-}
-
-// Pick (nx, ny, nz) for a compact 3D arrangement of N AABBs of dims (a,b,c).
-// Aim: minimize the longest side of the resulting cuboid, with nx*ny*nz >= N.
-function compactGrid(N, a, b, c) {
-  let best = null;
-  const upper = Math.ceil(Math.cbrt(N)) + 2;
-  for (let nx = 1; nx <= upper * 4; nx++) {
-    for (let ny = 1; ny <= upper * 4; ny++) {
-      const nz = Math.ceil(N / (nx * ny));
-      if (nz < 1) continue;
-      if (nx * ny * nz < N) continue;
-      const lx = nx * a, ly = ny * b, lz = nz * c;
-      const longest = Math.max(lx, ly, lz);
-      const slack = nx * ny * nz - N;
-      const score = longest + slack * Math.min(a, b, c) * 0.1;
-      if (!best || score < best.score) best = { nx, ny, nz, score };
-      if (nx * ny >= N) break;
-    }
-  }
-  return best;
-}
-
-function rebuildPack() {
-  if (!partGeoRaw || !rawExtents) return;
-
-  const realHval = parseFloat(realH.value);
-  const scale = (!isNaN(realHval) && realHval > 0) ? realHval / rawExtents[2] : 1;
-  const N = Math.min(5000, Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1)));
-  const gap = Math.max(0, parseFloat(gapInput.value) || 0);
-  const mode = layoutSel.value;
-
-  const w = rawExtents[0] * scale;
-  const d = rawExtents[1] * scale;
-  const h = rawExtents[2] * scale;
-  const dims = [w, d, h];
-
-  // Plan the pack.
-  // Each candidate is { mode, stackVol, place(buildInstancesFn), label, ... }.
-  // We always evaluate AABB candidates. Nesting candidates only if nestingResult is ready.
-  // For auto-best, we pick the one with smallest stack volume.
-  function aabb1DPlan() {
-    const idx = [0, 1, 2].sort((a, b) => dims[a] - dims[b])[0];
-    const nx_ = idx === 0 ? N : 1;
-    const ny_ = idx === 1 ? N : 1;
-    const nz_ = idx === 2 ? N : 1;
-    const sw = nx_ * w + Math.max(0, nx_ - 1) * gap;
-    const sd = ny_ * d + Math.max(0, ny_ - 1) * gap;
-    const sh = nz_ * h + Math.max(0, nz_ - 1) * gap;
-    return { kind: '1d', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh, axis: idx, label: `AABB column · ${'XYZ'[idx]}` };
-  }
-  function aabbAutoPlan() {
-    const g = compactGrid(N, w + gap, d + gap, h + gap);
-    const sw = g.nx * w + Math.max(0, g.nx - 1) * gap;
-    const sd = g.ny * d + Math.max(0, g.ny - 1) * gap;
-    const sh = g.nz * h + Math.max(0, g.nz - 1) * gap;
-    return { kind: 'auto', nx: g.nx, ny: g.ny, nz: g.nz, stackW: sw, stackD: sd, stackH: sh, label: `AABB 3D grid · ${g.nx}×${g.ny}×${g.nz}` };
-  }
-  function nestTransPlan() {
-    if (!nestingResult || nestingResult.error) return null;
-    const stridesScaled = nestingResult.strides.map(s => s * scale);
-    let bestIdx = 0;
-    for (let i = 1; i < 3; i++) if (stridesScaled[i] < stridesScaled[bestIdx]) bestIdx = i;
-    const stride = stridesScaled[bestIdx];
-    const nx_ = bestIdx === 0 ? N : 1;
-    const ny_ = bestIdx === 1 ? N : 1;
-    const nz_ = bestIdx === 2 ? N : 1;
-    const sw = bestIdx === 0 ? (N - 1) * (stride + gap) + w : w;
-    const sd = bestIdx === 1 ? (N - 1) * (stride + gap) + d : d;
-    const sh = bestIdx === 2 ? (N - 1) * (stride + gap) + h : h;
-    return { kind: 'nest', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh,
-             axis: bestIdx, stride, label: `Mesh-nest (translation) · ${'XYZ'[bestIdx]} stride ${stride.toFixed(2)} mm` };
-  }
-  function nestFlipPlan() {
-    if (!nestingResult || nestingResult.error || !nestingResult.flipStrides) return null;
-    // For each (stack, flip), compute total stack length:
-    //   total = (N-1) * (stride + gap) + partExtent
-    // Constraint: 2*(stride+gap) >= aabb_translation_stride for that axis (so consecutive
-    // same-orientation parts don't overlap). If violated, clamp stride.
-    const partExtents = [w, d, h];
-    const transStrides = nestingResult.strides.map(s => s * scale);
-    let best = null;
-    for (const fs of nestingResult.flipStrides) {
-      const stride0 = fs.stride * scale;
-      const minStride = (transStrides[fs.stack] / 2) - gap;
-      const stride = Math.max(stride0, minStride);
-      const ext = partExtents[fs.stack];
-      const total = (N - 1) * (stride + gap) + ext;
-      if (!best || total < best.total) {
-        best = { ...fs, stride, total, partExtent: ext };
+      * {
+        box-sizing: border-box;
       }
-    }
-    if (!best) return null;
-    const nx_ = best.stack === 0 ? N : 1;
-    const ny_ = best.stack === 1 ? N : 1;
-    const nz_ = best.stack === 2 ? N : 1;
-    const sw = best.stack === 0 ? best.total : w;
-    const sd = best.stack === 1 ? best.total : d;
-    const sh = best.stack === 2 ? best.total : h;
-    return { kind: 'nest-flip', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh,
-             axis: best.stack, flipAxis: best.flip, stride: best.stride,
-             label: `Mesh-nest (flip ${'XYZ'[best.flip]}) · stack ${'XYZ'[best.stack]} stride ${best.stride.toFixed(2)} mm` };
-  }
 
-  let plan;
-  if (mode === '1d') plan = aabb1DPlan();
-  else if (mode === 'auto') plan = aabbAutoPlan();
-  else if (mode === 'nest') plan = nestTransPlan() || aabb1DPlan();
-  else if (mode === 'nest-flip') plan = nestFlipPlan() || aabb1DPlan();
-  else { // auto-best
-    const candidates = [aabb1DPlan(), aabbAutoPlan(), nestTransPlan(), nestFlipPlan()].filter(Boolean);
-    candidates.forEach(c => c.vol = c.stackW * c.stackD * c.stackH);
-    candidates.sort((a, b) => a.vol - b.vol);
-    plan = candidates[0];
-  }
+      body {
+        margin: 0;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: #eef2f6;
+      }
 
-  const { nx, ny, nz, stackW, stackD, stackH } = plan;
-  const stackAxisLabel = plan.label;
-  const isFlipPlan = plan.kind === 'nest-flip';
-  const flipAxis = plan.flipAxis;
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px;
+      }
 
-  // Tear down previous instances
-  if (instancedMesh) { scene.remove(instancedMesh); try { instancedMesh.dispose(); } catch (_) {} instancedMesh = null; }
-  if (bboxLine) { scene.remove(bboxLine); bboxLine.geometry.dispose(); bboxLine.material.dispose(); bboxLine = null; }
-  if (activeScaledGeo) { activeScaledGeo.dispose(); activeScaledGeo = null; }
-  if (activeMaterial) { activeMaterial.dispose(); activeMaterial = null; }
+      header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 18px 0 24px;
+      }
 
-  // Scaled geometry
-  activeScaledGeo = partGeoRaw.clone();
-  activeScaledGeo.scale(scale, scale, scale);
-  activeMaterial = new THREE.MeshPhongMaterial({ color: 0x4a4d52, flatShading: false, specular: 0x111111, shininess: 25 });
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
 
-  // Total instances actually rendered = filled cells of nx*ny*nz up to N
-  instancedMesh = new THREE.InstancedMesh(activeScaledGeo, activeMaterial, N);
-  const dummy = new THREE.Object3D();
-  let placed = 0;
-  // Per-axis step size — nesting overrides the step on its chosen axis
-  const isNestPlan = plan.kind === 'nest' || plan.kind === 'nest-flip';
-  const stepX = (isNestPlan && plan.axis === 0) ? (plan.stride + gap) : (w + gap);
-  const stepY = (isNestPlan && plan.axis === 1) ? (plan.stride + gap) : (d + gap);
-  const stepZ = (isNestPlan && plan.axis === 2) ? (plan.stride + gap) : (h + gap);
-  outer:
-  for (let iz = 0; iz < nz; iz++) {
-    for (let iy = 0; iy < ny; iy++) {
-      for (let ix = 0; ix < nx; ix++) {
-        if (placed >= N) break outer;
-        const x = -stackW / 2 + w / 2 + ix * stepX;
-        const y = -stackD / 2 + d / 2 + iy * stepY;
-        const z = -stackH / 2 + h / 2 + iz * stepZ;
-        dummy.position.set(x, y, z);
-        if (isFlipPlan && (placed % 2 === 1)) {
-          if (flipAxis === 0)      dummy.rotation.set(Math.PI, 0, 0);
-          else if (flipAxis === 1) dummy.rotation.set(0, Math.PI, 0);
-          else                     dummy.rotation.set(0, 0, Math.PI);
-        } else {
-          dummy.rotation.set(0, 0, 0);
+      .brand-mark {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        background: #111827;
+        color: #e5e7eb;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .brand-name {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 54px);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .status {
+        min-width: 250px;
+        text-align: right;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(300px, 390px) 1fr;
+        gap: 20px;
+      }
+
+      section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .controls {
+        padding: 18px;
+      }
+
+      .results {
+        min-height: 520px;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 18px;
+      }
+
+      label {
+        display: block;
+        margin: 14px 0 7px;
+        color: #344054;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+      }
+
+      input,
+      select {
+        padding: 9px 10px;
+      }
+
+      input[type="file"] {
+        padding: 8px;
+      }
+
+      button {
+        margin-top: 16px;
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--accent-strong);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .hint {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .headline {
+        padding: 22px 24px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .count {
+        font-size: clamp(44px, 7vw, 86px);
+        line-height: 1;
+        font-weight: 900;
+        letter-spacing: 0;
+        color: var(--accent-strong);
+        overflow-wrap: anywhere;
+      }
+
+      .subcount {
+        margin-top: 10px;
+        color: var(--muted);
+      }
+
+      .viewer-wrap {
+        position: relative;
+        height: 360px;
+        min-height: 280px;
+        border-bottom: 1px solid var(--line);
+        background: #111827;
+        overflow: hidden;
+      }
+
+      #viewer {
+        width: 100%;
+        height: 100%;
+      }
+
+      .viewer-actions {
+        position: absolute;
+        right: 14px;
+        top: 14px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .viewer-actions button {
+        width: auto;
+        min-height: 34px;
+        margin: 0;
+        padding: 7px 12px;
+        border-color: rgba(255, 255, 255, 0.28);
+        background: rgba(17, 24, 39, 0.76);
+        color: #fff;
+        font-size: 13px;
+      }
+
+      .viewer-actions button.active {
+        border-color: #67e8f9;
+        background: rgba(15, 118, 110, 0.9);
+      }
+
+      .viewer-help {
+        position: absolute;
+        left: 14px;
+        bottom: 12px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 12px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .metric {
+        min-height: 112px;
+        padding: 18px;
+        background: #fff;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 24px;
+        overflow-wrap: anywhere;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .note {
+        padding: 16px 24px;
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--line);
+      }
+
+      .warning {
+        color: var(--warn);
+      }
+
+      @media (max-width: 820px) {
+        main {
+          padding: 16px;
         }
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        instancedMesh.setMatrixAt(placed, dummy.matrix);
-        placed++;
+
+        header,
+        .layout {
+          display: block;
+        }
+
+        .brand {
+          display: block;
+        }
+
+        .brand-mark {
+          margin-bottom: 16px;
+        }
+
+        .status {
+          margin-top: 10px;
+          min-width: 0;
+          text-align: left;
+        }
+
+        .results {
+          margin-top: 16px;
+          min-height: 0;
+        }
+
+        .metrics {
+          grid-template-columns: 1fr;
+        }
       }
-    }
-  }
-  instancedMesh.count = placed;
-  instancedMesh.instanceMatrix.needsUpdate = true;
-  scene.add(instancedMesh);
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">R</div>
+          <div>
+            <p class="brand-name">Roark / Intelligence</p>
+            <h1>STL Part Packing Calculator</h1>
+            <p class="hint">Upload an STL, set the container, and get the fitted count immediately.</p>
+          </div>
+        </div>
+        <div class="status" id="status">Loading sample STL...</div>
+      </header>
 
-  // Wireframe bounding box around the stack (computed AFTER stacking)
-  const boxGeo = new THREE.BoxGeometry(stackW, stackD, stackH);
-  const edges = new THREE.EdgesGeometry(boxGeo);
-  bboxLine = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x4f6df6, linewidth: 2 }));
-  scene.add(bboxLine);
-  boxGeo.dispose();
+      <div class="layout">
+        <section class="controls" aria-label="Controls">
+          <h2>Input</h2>
 
-  // Camera fit — refit on first build, on plan changes that make the stack much larger or
-  // smaller than what the camera currently sees, so the part is always visible.
-  const longest = Math.max(stackW, stackD, stackH);
-  camera.near = Math.max(0.001, longest / 1000);
-  camera.far = longest * 100;
-  camera.updateProjectionMatrix();
-  let needFit = !cameraInitialized;
-  if (cameraInitialized && lastFitDims) {
-    const ratio = longest / Math.max(...lastFitDims);
-    if (ratio > 1.5 || ratio < 0.5) needFit = true;
-  }
-  if (needFit) {
-    const r = longest * 1.6;
-    camera.position.set(r * 1.2, r * 0.85, r * 1.2);
-    controls.target.set(0, 0, 0);
-    controls.update();
-    cameraInitialized = true;
-    lastFitDims = [stackW, stackD, stackH];
-  }
+          <label for="file">STL file</label>
+          <input id="file" type="file" accept=".stl,model/stl" />
+          <p class="hint">The demo starts with the client-provided `base.stl` from the archive.</p>
 
-  // Sort dims for L/W/H labels
-  const partSorted = [...dims].sort((a, b) => b - a);
-  const pkgSorted = [stackW, stackD, stackH].sort((a, b) => b - a);
+          <label for="height">Actual part height</label>
+          <div class="row">
+            <input id="height" type="number" min="0.001" step="0.1" value="5" />
+            <select id="heightUnit">
+              <option value="10">cm</option>
+              <option value="1">mm</option>
+              <option value="1000">m</option>
+            </select>
+            <button id="sample" type="button">Sample</button>
+          </div>
 
-  document.getElementById('prtL').textContent = partSorted[0].toFixed(1);
-  document.getElementById('prtW').textContent = partSorted[1].toFixed(1);
-  document.getElementById('prtH').textContent = partSorted[2].toFixed(1);
-  document.getElementById('prtVol').textContent = (w * d * h / 1000).toFixed(2);
+          <label for="preset">Container preset</label>
+          <select id="preset">
+            <option value="1000,1000,1000,cm">Cube 1000 x 1000 x 1000 cm</option>
+            <option value="500,300,200,cm">Box 500 x 300 x 200 cm</option>
+            <option value="120,80,60,cm">Carton 120 x 80 x 60 cm</option>
+            <option value="custom">Custom</option>
+          </select>
 
-  document.getElementById('pkgL').textContent = pkgSorted[0].toFixed(1);
-  document.getElementById('pkgW').textContent = pkgSorted[1].toFixed(1);
-  document.getElementById('pkgH').textContent = pkgSorted[2].toFixed(1);
-  const pkgVolM3 = stackW * stackD * stackH / 1e9;
-  document.getElementById('pkgVol').textContent = pkgVolM3.toFixed(4);
-  document.getElementById('pkgQty').textContent = N.toLocaleString();
-  document.getElementById('pkgGap').textContent = gap;
-  document.getElementById('pkgGrid').textContent = `${nx} × ${ny} × ${nz}`;
+          <label>Container dimensions</label>
+          <div class="row">
+            <input id="cx" type="number" min="0.001" step="0.1" value="1000" aria-label="Container X" />
+            <input id="cy" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Y" />
+            <input id="cz" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Z" />
+          </div>
 
-  // Optional weight rows — only show if user provided unit weight
-  const unitW = parseFloat(unitWeightInput.value);
-  const showW = !isNaN(unitW) && unitW > 0;
-  document.getElementById('rowUnitWeight').hidden = !showW;
-  document.getElementById('rowTotalWeight').hidden = !showW;
-  document.getElementById('rowVolWeight').hidden = !showW;
-  if (showW) {
-    document.getElementById('pkgUnitWeight').textContent = unitW.toFixed(3);
-    document.getElementById('pkgTotalWeight').textContent = (unitW * N).toFixed(2);
-    // Standard international air-freight dim factor: 167 kg/m³
-    document.getElementById('pkgVolWeight').textContent = (pkgVolM3 * 167).toFixed(2);
-  }
+          <label for="containerUnit">Container unit</label>
+          <select id="containerUnit">
+            <option value="10">cm</option>
+            <option value="1">mm</option>
+            <option value="1000">m</option>
+          </select>
 
-  const stackVol = stackW * stackD * stackH;
-  const aabbBaseline = aabb1DPlan();
-  const aabbVol = aabbBaseline.stackW * aabbBaseline.stackD * aabbBaseline.stackH;
-  const tighter = aabbVol / stackVol;
-  let extra = '';
-  if (nestingComputing && (mode === 'nest' || mode === 'nest-flip' || mode === 'auto-best')) {
-    extra = ' · <em style="color:#d2a8ff">computing nesting strides…</em>';
-  } else if (plan.kind === 'nest' || plan.kind === 'nest-flip') {
-    if (tighter < 1.05) {
-      const hint = plan.kind === 'nest'
-        ? `try <em>Alternating flip</em> or <em>Auto</em>`
-        : `try <em>Translation</em> or <em>Auto</em>`;
-      extra = ` · <span style="color:#d2a8ff">no improvement over AABB — ${hint}</span>`;
-    } else {
-      extra = ` · <strong>${tighter.toFixed(2)}× tighter</strong> than AABB column (saves ${((1 - 1/tighter) * 100).toFixed(0)}% volume)`;
-    }
-  }
-  stackInfo.innerHTML = `
-    <strong>${N.toLocaleString()}</strong> parts · grid ${nx} × ${ny} × ${nz} · ${stackAxisLabel} ·
-    bbox <strong>${stackW.toFixed(1)} × ${stackD.toFixed(1)} × ${stackH.toFixed(1)} mm</strong>${extra}
-  `;
-}
-</script>
-</body>
+          <p class="hint">STL files do not contain a reliable real-world unit, so the actual part height is used to scale the imported model.</p>
+        </section>
+
+        <section class="results" aria-label="Results">
+          <div class="headline">
+            <div class="count" id="count">-</div>
+            <div class="subcount" id="summary">Waiting for STL geometry</div>
+          </div>
+
+          <div class="viewer-wrap">
+            <div id="viewer" aria-label="Interactive STL viewer"></div>
+            <div class="viewer-actions">
+              <button id="partView" type="button">Part</button>
+              <button id="stackView" type="button" class="active">Packed stack</button>
+              <button id="resetView" type="button">Reset view</button>
+            </div>
+            <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric">
+              <span>Scaled model bounding box</span>
+              <strong id="modelDims">-</strong>
+            </div>
+            <div class="metric">
+              <span>Container</span>
+              <strong id="containerDims">-</strong>
+            </div>
+            <div class="metric">
+              <span>Best orientation</span>
+              <strong id="orientation">-</strong>
+            </div>
+            <div class="metric">
+              <span>Fit grid</span>
+              <strong id="grid">-</strong>
+            </div>
+            <div class="metric">
+              <span>Packed stack bounding box</span>
+              <strong id="packedDims">-</strong>
+            </div>
+          </div>
+
+          <div class="note" id="note">Calculation uses the STL bounding box and tests every axis-aligned orientation.</div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.164.1/build/three.module.js";
+      import { OrbitControls } from "https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js";
+
+      const els = {
+        file: document.getElementById("file"),
+        height: document.getElementById("height"),
+        heightUnit: document.getElementById("heightUnit"),
+        sample: document.getElementById("sample"),
+        preset: document.getElementById("preset"),
+        cx: document.getElementById("cx"),
+        cy: document.getElementById("cy"),
+        cz: document.getElementById("cz"),
+        containerUnit: document.getElementById("containerUnit"),
+        status: document.getElementById("status"),
+        count: document.getElementById("count"),
+        summary: document.getElementById("summary"),
+        modelDims: document.getElementById("modelDims"),
+        containerDims: document.getElementById("containerDims"),
+        orientation: document.getElementById("orientation"),
+        grid: document.getElementById("grid"),
+        packedDims: document.getElementById("packedDims"),
+        note: document.getElementById("note"),
+        viewer: document.getElementById("viewer"),
+        partView: document.getElementById("partView"),
+        stackView: document.getElementById("stackView"),
+        resetView: document.getElementById("resetView"),
+      };
+
+      let rawExtents = null;
+      let currentVertices = null;
+      let currentName = "base.stl";
+      let modelMesh = null;
+      let modelEdges = null;
+      let packedGroup = null;
+      let packedBounds = null;
+      let viewerMode = "packed";
+      let lastBest = null;
+      let lastScale = 1;
+      const sampleRawExtents = [
+        1.5600549578666687,
+        0.7603219449520111,
+        1.9065090359601715,
+      ];
+
+      function fmt(n, digits = 2) {
+        return Number(n).toLocaleString(undefined, {
+          maximumFractionDigits: digits,
+        });
+      }
+
+      function fmtDims(values) {
+        return values.map((v) => fmt(v)).join(" x ") + " mm";
+      }
+
+      function permutations(values) {
+        const seen = new Set();
+        const out = [];
+        for (const a of values) {
+          for (const b of values) {
+            for (const c of values) {
+              const candidate = [a, b, c];
+              const used = [...values];
+              let ok = true;
+              for (const value of candidate) {
+                const index = used.indexOf(value);
+                if (index === -1) {
+                  ok = false;
+                  break;
+                }
+                used.splice(index, 1);
+              }
+              const key = candidate.join("|");
+              if (ok && !seen.has(key)) {
+                seen.add(key);
+                out.push(candidate);
+              }
+            }
+          }
+        }
+        return out;
+      }
+
+      function parseAsciiStl(text) {
+        const matches = text.matchAll(/vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g);
+        const vertices = [];
+        for (const match of matches) {
+          vertices.push(Number(match[1]), Number(match[2]), Number(match[3]));
+        }
+        return geometryDataFromVertices(vertices);
+      }
+
+      function parseBinaryStl(buffer) {
+        const view = new DataView(buffer);
+        const triangleCount = view.getUint32(80, true);
+        const expectedLength = 84 + triangleCount * 50;
+        if (buffer.byteLength < expectedLength) {
+          throw new Error("Invalid binary STL length.");
+        }
+
+        const vertices = [];
+        let offset = 84;
+        for (let i = 0; i < triangleCount; i += 1) {
+          offset += 12;
+          for (let v = 0; v < 3; v += 1) {
+            vertices.push(
+              view.getFloat32(offset, true),
+              view.getFloat32(offset + 4, true),
+              view.getFloat32(offset + 8, true),
+            );
+            offset += 12;
+          }
+          offset += 2;
+        }
+        return geometryDataFromVertices(vertices);
+      }
+
+      function geometryDataFromVertices(vertices) {
+        if (!vertices.length) {
+          throw new Error("No STL vertices found.");
+        }
+
+        const min = [Infinity, Infinity, Infinity];
+        const max = [-Infinity, -Infinity, -Infinity];
+        for (let i = 0; i < vertices.length; i += 3) {
+          for (let axis = 0; axis < 3; axis += 1) {
+            const value = vertices[i + axis];
+            if (!Number.isFinite(value)) {
+              throw new Error("STL contains invalid vertex values.");
+            }
+            min[axis] = Math.min(min[axis], value);
+            max[axis] = Math.max(max[axis], value);
+          }
+        }
+
+        const extents = max.map((value, axis) => value - min[axis]);
+        if (extents.some((value) => value <= 0)) {
+          throw new Error("STL has invalid 3D dimensions.");
+        }
+        return { extents, vertices, min, max };
+      }
+
+      async function parseStl(fileOrResponse) {
+        const buffer = await fileOrResponse.arrayBuffer();
+        const header = new Uint8Array(buffer.slice(0, 8));
+        if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47) {
+          throw new Error("This file is a PNG image, not an STL model.");
+        }
+
+        const textHeader = new TextDecoder().decode(buffer.slice(0, 256)).trimStart();
+        if (textHeader.startsWith("solid")) {
+          try {
+            return parseAsciiStl(new TextDecoder().decode(buffer));
+          } catch {
+            return parseBinaryStl(buffer);
+          }
+        }
+        return parseBinaryStl(buffer);
+      }
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111827);
+
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      els.viewer.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2.2));
+      const keyLight = new THREE.DirectionalLight(0xffffff, 2.6);
+      keyLight.position.set(4, 5, 6);
+      scene.add(keyLight);
+
+      const grid = new THREE.GridHelper(120, 24, 0x334155, 0x334155);
+      grid.material.opacity = 0.38;
+      grid.material.transparent = true;
+      scene.add(grid);
+
+      function resizeViewer() {
+        const width = Math.max(1, els.viewer.clientWidth);
+        const height = Math.max(1, els.viewer.clientHeight);
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+
+      function clearModel() {
+        for (const object of [modelMesh, modelEdges]) {
+          if (!object) continue;
+          scene.remove(object);
+          object.geometry.dispose();
+          object.material.dispose();
+        }
+        modelMesh = null;
+        modelEdges = null;
+        clearPackedView();
+      }
+
+      function disposeObject(object) {
+        object.traverse((child) => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((material) => material.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
+
+      function clearPackedView() {
+        for (const object of [packedGroup, packedBounds]) {
+          if (!object) continue;
+          scene.remove(object);
+          disposeObject(object);
+        }
+        packedGroup = null;
+        packedBounds = null;
+      }
+
+      function setViewerModel(vertices) {
+        clearModel();
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.computeVertexNormals();
+        geometry.computeBoundingBox();
+
+        const center = new THREE.Vector3();
+        geometry.boundingBox.getCenter(center);
+        geometry.translate(-center.x, -center.y, -center.z);
+
+        modelMesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            color: 0xb8c0cc,
+            roughness: 0.48,
+            metalness: 0.18,
+            side: THREE.DoubleSide,
+          }),
+        );
+        scene.add(modelMesh);
+
+        modelEdges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geometry, 24),
+          new THREE.LineBasicMaterial({ color: 0x4b5563, transparent: true, opacity: 0.42 }),
+        );
+        scene.add(modelEdges);
+        updateViewerScale(lastScale, true);
+      }
+
+      function fitCameraToModel() {
+        const target =
+          viewerMode === "packed" && (packedBounds || packedGroup)
+            ? packedBounds || packedGroup
+            : modelMesh;
+        if (!target) return;
+        const box = new THREE.Box3().setFromObject(target);
+        const sphere = box.getBoundingSphere(new THREE.Sphere());
+        const radius = Math.max(sphere.radius, 1);
+        const distance = radius / Math.sin((camera.fov * Math.PI) / 360);
+        camera.position.set(distance * 0.72, distance * 0.54, distance * 0.82);
+        camera.near = Math.max(radius / 1000, 0.001);
+        camera.far = distance * 10;
+        camera.updateProjectionMatrix();
+        controls.target.set(0, 0, 0);
+        controls.update();
+      }
+
+      function updateViewerScale(scale, refit = false) {
+        lastScale = scale;
+        if (!modelMesh || !modelEdges) return;
+        modelMesh.scale.setScalar(scale);
+        modelEdges.scale.setScalar(scale);
+        if (refit) fitCameraToModel();
+      }
+
+      function setViewerMode(mode) {
+        viewerMode = mode;
+        const partVisible = mode === "part";
+        if (modelMesh) modelMesh.visible = partVisible;
+        if (modelEdges) modelEdges.visible = partVisible;
+        if (packedGroup) packedGroup.visible = !partVisible;
+        if (packedBounds) packedBounds.visible = !partVisible;
+        els.partView.classList.toggle("active", partVisible);
+        els.stackView.classList.toggle("active", !partVisible);
+        fitCameraToModel();
+      }
+
+      function makePackedDisplayGrid(gridValues, maxInstances = 720) {
+        const total = gridValues.reduce((product, value) => product * value, 1);
+        if (total <= maxInstances) return [...gridValues];
+
+        const caps = [12, 10, 8];
+        const factor = Math.cbrt(maxInstances / total);
+        const display = gridValues.map((value, axis) =>
+          Math.max(1, Math.min(caps[axis], Math.round(value * factor))),
+        );
+        while (display.reduce((product, value) => product * value, 1) > maxInstances) {
+          let largestAxis = 0;
+          for (let axis = 1; axis < 3; axis += 1) {
+            if (display[axis] > display[largestAxis]) largestAxis = axis;
+          }
+          display[largestAxis] = Math.max(1, display[largestAxis] - 1);
+        }
+        return display;
+      }
+
+      function buildPackedView(best) {
+        clearPackedView();
+        if (!best || best.count <= 0) return;
+
+        const dims = best.orientation;
+        const fullGrid = best.grid;
+        const occupied = dims.map((value, axis) => value * fullGrid[axis]);
+        const displayGrid = makePackedDisplayGrid(fullGrid);
+        const displayCount = displayGrid.reduce((product, value) => product * value, 1);
+        const aggregateMode = displayCount < best.count;
+        const displayCell = aggregateMode
+          ? occupied.map((value, axis) => value / displayGrid[axis])
+          : [...dims];
+        const visibleBlock = displayCell.map((value) => value * (aggregateMode ? 0.94 : 0.96));
+
+        const boxGeometry = new THREE.BoxGeometry(visibleBlock[0], visibleBlock[1], visibleBlock[2]);
+        const boxMaterial = new THREE.MeshStandardMaterial({
+          color: 0xc7ced8,
+          roughness: 0.56,
+          metalness: 0.12,
+          vertexColors: true,
+        });
+        const instances = new THREE.InstancedMesh(boxGeometry, boxMaterial, displayCount);
+        instances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+        const matrix = new THREE.Matrix4();
+        const color = new THREE.Color();
+        let item = 0;
+        for (let x = 0; x < displayGrid[0]; x += 1) {
+          for (let y = 0; y < displayGrid[1]; y += 1) {
+            for (let z = 0; z < displayGrid[2]; z += 1) {
+              matrix.makeTranslation(
+                x * displayCell[0] + displayCell[0] / 2 - occupied[0] / 2,
+                y * displayCell[1] + displayCell[1] / 2 - occupied[1] / 2,
+                z * displayCell[2] + displayCell[2] / 2 - occupied[2] / 2,
+              );
+              instances.setMatrixAt(item, matrix);
+              color.setHSL(0.58, 0.16, 0.58 + ((x + y + z) % 3) * 0.06);
+              instances.setColorAt(item, color);
+              item += 1;
+            }
+          }
+        }
+        instances.count = item;
+        if (instances.instanceColor) instances.instanceColor.needsUpdate = true;
+
+        packedGroup = new THREE.Group();
+        packedGroup.add(instances);
+
+        scene.add(packedGroup);
+
+        const boundsGeometry = new THREE.BoxGeometry(occupied[0], occupied[1], occupied[2]);
+        packedBounds = new THREE.LineSegments(
+          new THREE.EdgesGeometry(boundsGeometry),
+          new THREE.LineBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.95 }),
+        );
+        scene.add(packedBounds);
+
+        packedGroup.userData = { displayCount, occupied, aggregateMode };
+        setViewerMode(viewerMode);
+      }
+
+      new ResizeObserver(resizeViewer).observe(els.viewer);
+      resizeViewer();
+
+      function animate() {
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      function calculate() {
+        if (!rawExtents) {
+          return;
+        }
+
+        const actualHeightMm = Number(els.height.value) * Number(els.heightUnit.value);
+        const container = [Number(els.cx.value), Number(els.cy.value), Number(els.cz.value)].map(
+          (value) => value * Number(els.containerUnit.value),
+        );
+
+        if (!actualHeightMm || container.some((value) => !value || value <= 0)) {
+          els.summary.textContent = "Enter positive dimensions.";
+          return;
+        }
+
+        const scale = actualHeightMm / Math.max(...rawExtents);
+        const model = rawExtents.map((value) => value * scale);
+        updateViewerScale(scale, viewerMode === "part");
+        let best = null;
+
+        for (const orientation of permutations(model)) {
+          const grid = orientation.map((value, axis) => Math.floor(container[axis] / value));
+          const count = grid.reduce((product, value) => product * value, 1);
+          if (!best || count > best.count) {
+            best = { count, orientation, grid };
+          }
+        }
+        lastBest = best;
+        buildPackedView(best);
+
+        els.count.textContent = fmt(best.count, 0);
+        els.summary.textContent = `${currentName} calculated instantly from bounding-box packing`;
+        els.modelDims.textContent = fmtDims(model);
+        els.containerDims.textContent = fmtDims(container);
+        els.orientation.textContent = fmtDims(best.orientation);
+        els.grid.textContent = best.grid.map((value) => fmt(value, 0)).join(" x ");
+        const occupied = best.orientation.map((value, axis) => value * best.grid[axis]);
+        els.packedDims.textContent = fmtDims(occupied);
+        els.note.className = "note";
+        const shown = packedGroup?.userData?.displayCount ?? best.count;
+        const shownText =
+          shown < best.count
+            ? ` Packed view shows ${fmt(shown, 0)} aggregate stack blocks; each block represents a group of parts.`
+            : "";
+        els.note.textContent = `Post-stacking bounding box: ${fmtDims(occupied)}.${shownText} Count uses exact axis-aligned bounding-box packing.`;
+      }
+
+      async function loadSample() {
+        try {
+          els.status.textContent = "Loading sample STL...";
+          const response = await fetch("base.stl");
+          const data = await parseStl(response);
+          rawExtents = data.extents;
+          currentVertices = data.vertices;
+          currentName = "base.stl";
+          setViewerModel(currentVertices);
+          els.status.textContent = "Client sample loaded";
+          calculate();
+        } catch (error) {
+          rawExtents = [...sampleRawExtents];
+          currentVertices = null;
+          currentName = "base.stl";
+          clearModel();
+          els.status.textContent = "Sample dimensions loaded";
+          els.note.className = "note warning";
+          els.note.textContent = "Sample count is available, but the sample STL file was not reachable for 3D viewing.";
+          calculate();
+        }
+      }
+
+      async function loadFile(file) {
+        try {
+          els.status.textContent = "Reading upload...";
+          const data = await parseStl(file);
+          rawExtents = data.extents;
+          currentVertices = data.vertices;
+          currentName = file.name;
+          setViewerModel(currentVertices);
+          els.status.textContent = "Uploaded STL loaded";
+          calculate();
+        } catch (error) {
+          rawExtents = null;
+          currentVertices = null;
+          clearModel();
+          els.status.textContent = "Upload failed";
+          els.count.textContent = "-";
+          els.summary.textContent = "Could not read STL geometry";
+          els.note.className = "note warning";
+          els.note.textContent = error.message;
+        }
+      }
+
+      els.file.addEventListener("change", () => {
+        const [file] = els.file.files;
+        if (file) {
+          loadFile(file);
+        }
+      });
+
+      els.sample.addEventListener("click", loadSample);
+      els.partView.addEventListener("click", () => setViewerMode("part"));
+      els.stackView.addEventListener("click", () => setViewerMode("packed"));
+      els.resetView.addEventListener("click", fitCameraToModel);
+
+      els.preset.addEventListener("change", () => {
+        if (els.preset.value === "custom") {
+          return;
+        }
+        const [x, y, z, unit] = els.preset.value.split(",");
+        els.cx.value = x;
+        els.cy.value = y;
+        els.cz.value = z;
+        els.containerUnit.value = unit === "cm" ? "10" : unit === "m" ? "1000" : "1";
+        calculate();
+      });
+
+      for (const el of [els.height, els.heightUnit, els.cx, els.cy, els.cz, els.containerUnit]) {
+        el.addEventListener("input", () => {
+          els.preset.value = "custom";
+          calculate();
+        });
+      }
+
+      loadSample();
+    </script>
+  </body>
 </html>
