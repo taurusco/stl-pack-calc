@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>A - Roark Container Fit Counter</title>
+    <title>Roark Intelligence - STL Container Fit Counter</title>
     <style>
       :root {
         color-scheme: light;
@@ -53,14 +53,11 @@
       .brand-mark {
         width: 44px;
         height: 44px;
-        display: grid;
-        place-items: center;
         border: 1px solid #334155;
         border-radius: 8px;
         background: #111827;
-        color: #e5e7eb;
-        font-weight: 900;
-        letter-spacing: 0;
+        object-fit: cover;
+        display: block;
       }
 
       .brand-name {
@@ -72,7 +69,7 @@
         text-transform: uppercase;
       }
 
-      .variant-badge {
+      .product-badge {
         display: inline-block;
         margin: 0 0 8px;
         padding: 4px 8px;
@@ -88,7 +85,7 @@
 
       h1 {
         margin: 0;
-        font-size: clamp(30px, 4vw, 54px);
+        font-size: clamp(30px, 3.6vw, 48px);
         line-height: 1;
         letter-spacing: 0;
       }
@@ -114,6 +111,48 @@
 
       .controls {
         padding: 18px;
+      }
+
+      .demo-card {
+        margin: 16px 0 4px;
+        padding: 14px;
+        border: 1px solid #b8e6de;
+        border-radius: 8px;
+        background: #f0fdfa;
+      }
+
+      .demo-card strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #134e4a;
+        font-size: 14px;
+      }
+
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .demo-item {
+        padding: 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .demo-item span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .demo-item b {
+        display: block;
+        margin-top: 3px;
+        color: var(--ink);
+        font-size: 14px;
       }
 
       .results {
@@ -199,6 +238,15 @@
       .subcount {
         margin-top: 10px;
         color: var(--muted);
+      }
+
+      .result-label {
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .viewer-wrap {
@@ -315,6 +363,10 @@
         .metrics {
           grid-template-columns: 1fr;
         }
+
+        .demo-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -322,12 +374,12 @@
     <main>
       <header>
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true">R</div>
+          <img class="brand-mark" src="roark.jpg" alt="Roark Intelligence" />
           <div>
             <p class="brand-name">Roark / Intelligence</p>
-            <div class="variant-badge">A Test - Container Fit Counter</div>
+            <div class="product-badge">STL Container Fit Counter</div>
             <h1>How Many Parts Fit?</h1>
-            <p class="hint">Upload an STL, choose a container size, and get the maximum fitted count immediately.</p>
+            <p class="hint">Upload an STL, choose a container, and get a packed count with a 3D inspection view.</p>
           </div>
         </div>
         <div class="status" id="status">Loading sample STL...</div>
@@ -335,11 +387,33 @@
 
       <div class="layout">
         <section class="controls" aria-label="Controls">
-          <h2>A - Container Capacity Input</h2>
+          <h2>Container Capacity Input</h2>
 
           <label for="file">STL file</label>
           <input id="file" type="file" accept=".stl,model/stl" />
           <p class="hint">The demo starts with the client-provided `base.stl` from the archive.</p>
+
+          <div class="demo-card">
+            <strong>Loaded test scenario</strong>
+            <div class="demo-grid">
+              <div class="demo-item">
+                <span>STL</span>
+                <b>base.stl</b>
+              </div>
+              <div class="demo-item">
+                <span>Part height</span>
+                <b>5 cm</b>
+              </div>
+              <div class="demo-item">
+                <span>Container</span>
+                <b>1000 cm cube</b>
+              </div>
+              <div class="demo-item">
+                <span>Expected count</span>
+                <b>24,448,800</b>
+              </div>
+            </div>
+          </div>
 
           <label for="height">Actual part height</label>
           <div class="row">
@@ -379,6 +453,7 @@
 
         <section class="results" aria-label="Results">
           <div class="headline">
+            <div class="result-label">Maximum fitted quantity</div>
             <div class="count" id="count">-</div>
             <div class="subcount" id="summary">Waiting for STL geometry</div>
           </div>
@@ -413,6 +488,10 @@
             <div class="metric">
               <span>Packed stack bounding box</span>
               <strong id="packedDims">-</strong>
+            </div>
+            <div class="metric">
+              <span>Method</span>
+              <strong>6 orientations</strong>
             </div>
           </div>
 
