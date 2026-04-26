@@ -62,7 +62,7 @@
   <div class="card">
     <div id="drop">
       <div><strong>Drop your .STL here</strong></div>
-      <div class="info">or click to choose a file &nbsp;·&nbsp; <button class="demo-btn" id="demo">try demo part</button></div>
+      <div class="info">or click to choose a file &nbsp;·&nbsp; demos: <button class="demo-btn" data-demo="tray">tapered tote</button> &nbsp;·&nbsp; <button class="demo-btn" data-demo="beam">tapered beam</button> &nbsp;·&nbsp; <button class="demo-btn" data-demo="base">closed bracket</button></div>
       <input type="file" id="file" accept=".stl,.STL" hidden>
     </div>
   </div>
@@ -91,11 +91,13 @@
         <div class="field">
           <label>Stacking layout</label>
           <select id="layout">
-            <option value="nest" selected>Mesh nesting (dense, 1D) — slot parts inside each other</option>
-            <option value="1d">Single column (AABB, along shortest axis)</option>
-            <option value="auto">Compact 3D grid (AABB)</option>
+            <option value="auto-best" selected>Auto — pick the densest mode</option>
+            <option value="nest">Mesh nesting (translation only)</option>
+            <option value="nest-flip">Mesh nesting (alternating 180° flip)</option>
+            <option value="1d">AABB single column (shortest axis)</option>
+            <option value="auto">AABB compact 3D grid</option>
           </select>
-          <div class="small">"Mesh nesting" finds the tightest non-overlapping stride for U-channels and other nestable parts. "AABB" treats parts as solid bounding boxes.</div>
+          <div class="small">"Auto" tries every mode and picks whichever gives the smallest packaging volume. "Translation" slides identical parts together; "alternating flip" rotates every other part 180° to mate open mouths.</div>
         </div>
       </div>
 
@@ -203,7 +205,7 @@ resize();
   renderer.render(scene, camera);
 })();
 
-drop.onclick = (e) => { if (e.target.id !== 'demo') fileInput.click(); };
+drop.onclick = (e) => { if (!e.target.classList.contains('demo-btn')) fileInput.click(); };
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
 drop.ondrop = (e) => {
@@ -215,19 +217,36 @@ fileInput.onchange = () => { if (fileInput.files[0]) loadFromFile(fileInput.file
 
 [realH, qtyInput, gapInput, layoutSel].forEach(el => el.addEventListener('input', rebuildPack));
 
-demoBtn.onclick = async (e) => {
-  e.stopPropagation();
-  stackInfo.textContent = 'Loading demo part…';
+const DEMOS = {
+  tray: { url: './tray.stl', realH: '' },
+  beam: { url: './beam.stl', realH: '' },
+  base: { url: './base.stl', realH: '50' },
+};
+
+async function loadDemo(name) {
+  const d = DEMOS[name];
+  if (!d) return;
+  stackInfo.textContent = `Loading demo: ${name}…`;
   try {
-    const res = await fetch('./base.stl');
+    const res = await fetch(d.url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const buf = await res.arrayBuffer();
-    realH.value = '50';
+    realH.value = d.realH;
     loadFromBuffer(buf);
   } catch (err) {
     stackInfo.innerHTML = '<span class="err">Demo load failed: ' + err.message + '</span>';
   }
-};
+}
+
+document.querySelectorAll('.demo-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    loadDemo(btn.dataset.demo);
+  });
+});
+
+// Auto-load the tray demo on first paint so the page never looks empty
+window.addEventListener('load', () => loadDemo('tray'));
 
 async function loadFromFile(file) {
   const buf = await file.arrayBuffer();
@@ -268,17 +287,32 @@ function loadFromBuffer(buf) {
 async function computeNesting() {
   if (!partGeoRaw || nestingComputing) return;
   nestingComputing = true;
-  // Yield so the UI can render the "computing" state
-  await new Promise(r => setTimeout(r, 30));
+  await new Promise(r => setTimeout(r, 30));   // let the UI paint "computing" state
   try {
     partGeoRaw.computeBoundsTree();
     const [w, d, h] = rawExtents;
+    const partExtents = [w, d, h];
+
+    // Pure translation strides: 3 axes
     const strides = [
-      findNestingStride(partGeoRaw, 0, w),
-      findNestingStride(partGeoRaw, 1, d),
-      findNestingStride(partGeoRaw, 2, h),
+      findStride(partGeoRaw, 0, w, null),
+      findStride(partGeoRaw, 1, d, null),
+      findStride(partGeoRaw, 2, h, null),
     ];
-    nestingResult = { strides };
+
+    // Alternating-flip strides: for each (stack_axis, flip_axis) pair, where flip_axis ≠ stack_axis
+    // (flipping around the stack axis doesn't change the silhouette in the stacking direction).
+    // 3 stack × 2 flip = 6 combinations.
+    const flipStrides = [];
+    for (let stack = 0; stack < 3; stack++) {
+      for (let flip = 0; flip < 3; flip++) {
+        if (flip === stack) continue;
+        const s = findStride(partGeoRaw, stack, partExtents[stack], flip);
+        flipStrides.push({ stack, flip, stride: s });
+      }
+    }
+
+    nestingResult = { strides, flipStrides };
   } catch (err) {
     console.error('Nesting failed:', err);
     nestingResult = { error: err.message };
@@ -288,31 +322,35 @@ async function computeNesting() {
   }
 }
 
-function intersectsAtOffset(geo, axis, offset) {
+function intersectsAt(geo, axis, offset, flipAxis) {
+  // Test whether `geo` (at origin) intersects a copy of `geo` translated by `offset` along
+  // `axis`, optionally rotated 180° around `flipAxis` first. flipAxis === null → no flip.
   const m = new THREE.Matrix4();
-  const v = [0, 0, 0];
-  v[axis] = offset;
-  m.makeTranslation(v[0], v[1], v[2]);
+  if (flipAxis === 0)      m.makeRotationX(Math.PI);
+  else if (flipAxis === 1) m.makeRotationY(Math.PI);
+  else if (flipAxis === 2) m.makeRotationZ(Math.PI);
+  else                     m.identity();
+  const pos = new THREE.Vector3(0, 0, 0);
+  pos.setComponent(axis, offset);
+  m.setPosition(pos);
   return geo.boundsTree.intersectsGeometry(geo, m);
 }
 
-function findNestingStride(geo, axis, partExtent) {
-  // Smallest offset >= 0 at which a copy along `axis` does NOT intersect the original.
-  // For nestable parts this is much smaller than partExtent.
-  if (!intersectsAtOffset(geo, axis, partExtent + 1e-3)) {
-    // hi clearly clear — start binary search
-    let lo = 0, hi = partExtent;
-    // Make sure lo overlaps (it should at offset 0)
-    if (!intersectsAtOffset(geo, axis, lo)) return 0;
-    for (let i = 0; i < 22; i++) {
-      const mid = (lo + hi) / 2;
-      if (intersectsAtOffset(geo, axis, mid)) lo = mid;
-      else hi = mid;
-    }
-    return hi;
+function findStride(geo, axis, partExtent, flipAxis) {
+  // Smallest offset along `axis` (≥ 0) at which a copy doesn't intersect.
+  // With flipAxis !== null, the copy is also flipped 180° around that axis.
+  // Search range: [0, 2 × partExtent] to handle cases where flipping shifts the silhouette.
+  const upper = partExtent * 2 + 1;
+  if (intersectsAt(geo, axis, upper, flipAxis)) return upper;   // bail out
+  let lo = 0, hi = upper;
+  // Make sure offset 0 overlaps. If not, return 0 immediately.
+  if (!intersectsAt(geo, axis, 0, flipAxis)) return 0;
+  for (let i = 0; i < 22; i++) {
+    const mid = (lo + hi) / 2;
+    if (intersectsAt(geo, axis, mid, flipAxis)) lo = mid;
+    else hi = mid;
   }
-  // shouldn't happen for AABB-correct parts
-  return partExtent;
+  return hi;
 }
 
 // Pick (nx, ny, nz) for a compact 3D arrangement of N AABBs of dims (a,b,c).
@@ -350,60 +388,89 @@ function rebuildPack() {
   const h = rawExtents[2] * scale;
   const dims = [w, d, h];
 
-  // Decide grid: nx * ny * nz >= N
-  let nx = 1, ny = 1, nz = 1;
-  let stackAxisLabel = '';
-  let nestStride = null;            // in scaled (mm) units, only set in nesting mode
-  let nestAxisIdx = -1;
-  let modeUsed = mode;
-
-  if (mode === 'nest') {
-    if (nestingComputing || !nestingResult) {
-      // Fall back to 1D AABB while nesting computes; we'll re-render when done
-      modeUsed = '1d';
-    } else if (nestingResult.error) {
-      modeUsed = '1d';
-    } else {
-      const stridesScaled = nestingResult.strides.map(s => s * scale);
-      // Pick axis with smallest stride (densest nesting)
-      let bestIdx = 0;
-      for (let i = 1; i < 3; i++) if (stridesScaled[i] < stridesScaled[bestIdx]) bestIdx = i;
-      nestAxisIdx = bestIdx;
-      nestStride = stridesScaled[bestIdx];
-      stackAxisLabel = ['X', 'Y', 'Z'][bestIdx] + ' (mesh-nested)';
-    }
-  }
-
-  if (modeUsed === '1d') {
+  // Plan the pack.
+  // Each candidate is { mode, stackVol, place(buildInstancesFn), label, ... }.
+  // We always evaluate AABB candidates. Nesting candidates only if nestingResult is ready.
+  // For auto-best, we pick the one with smallest stack volume.
+  function aabb1DPlan() {
     const idx = [0, 1, 2].sort((a, b) => dims[a] - dims[b])[0];
-    if (idx === 0) { nx = N; stackAxisLabel = 'X (AABB, shortest)'; }
-    else if (idx === 1) { ny = N; stackAxisLabel = 'Y (AABB, shortest)'; }
-    else { nz = N; stackAxisLabel = 'Z (AABB, shortest)'; }
-  } else if (modeUsed === 'auto') {
+    const nx_ = idx === 0 ? N : 1;
+    const ny_ = idx === 1 ? N : 1;
+    const nz_ = idx === 2 ? N : 1;
+    const sw = nx_ * w + Math.max(0, nx_ - 1) * gap;
+    const sd = ny_ * d + Math.max(0, ny_ - 1) * gap;
+    const sh = nz_ * h + Math.max(0, nz_ - 1) * gap;
+    return { kind: '1d', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh, axis: idx, label: `AABB column · ${'XYZ'[idx]}` };
+  }
+  function aabbAutoPlan() {
     const g = compactGrid(N, w + gap, d + gap, h + gap);
-    nx = g.nx; ny = g.ny; nz = g.nz;
-    stackAxisLabel = 'AABB 3D';
-  } else if (modeUsed === 'nest') {
-    if (nestAxisIdx === 0) nx = N;
-    else if (nestAxisIdx === 1) ny = N;
-    else nz = N;
+    const sw = g.nx * w + Math.max(0, g.nx - 1) * gap;
+    const sd = g.ny * d + Math.max(0, g.ny - 1) * gap;
+    const sh = g.nz * h + Math.max(0, g.nz - 1) * gap;
+    return { kind: 'auto', nx: g.nx, ny: g.ny, nz: g.nz, stackW: sw, stackD: sd, stackH: sh, label: `AABB 3D grid · ${g.nx}×${g.ny}×${g.nz}` };
+  }
+  function nestTransPlan() {
+    if (!nestingResult || nestingResult.error) return null;
+    const stridesScaled = nestingResult.strides.map(s => s * scale);
+    let bestIdx = 0;
+    for (let i = 1; i < 3; i++) if (stridesScaled[i] < stridesScaled[bestIdx]) bestIdx = i;
+    const stride = stridesScaled[bestIdx];
+    const nx_ = bestIdx === 0 ? N : 1;
+    const ny_ = bestIdx === 1 ? N : 1;
+    const nz_ = bestIdx === 2 ? N : 1;
+    const sw = bestIdx === 0 ? (N - 1) * (stride + gap) + w : w;
+    const sd = bestIdx === 1 ? (N - 1) * (stride + gap) + d : d;
+    const sh = bestIdx === 2 ? (N - 1) * (stride + gap) + h : h;
+    return { kind: 'nest', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh,
+             axis: bestIdx, stride, label: `Mesh-nest (translation) · ${'XYZ'[bestIdx]} stride ${stride.toFixed(2)} mm` };
+  }
+  function nestFlipPlan() {
+    if (!nestingResult || nestingResult.error || !nestingResult.flipStrides) return null;
+    // For each (stack, flip), compute total stack length:
+    //   total = (N-1) * (stride + gap) + partExtent
+    // Constraint: 2*(stride+gap) >= aabb_translation_stride for that axis (so consecutive
+    // same-orientation parts don't overlap). If violated, clamp stride.
+    const partExtents = [w, d, h];
+    const transStrides = nestingResult.strides.map(s => s * scale);
+    let best = null;
+    for (const fs of nestingResult.flipStrides) {
+      const stride0 = fs.stride * scale;
+      const minStride = (transStrides[fs.stack] / 2) - gap;
+      const stride = Math.max(stride0, minStride);
+      const ext = partExtents[fs.stack];
+      const total = (N - 1) * (stride + gap) + ext;
+      if (!best || total < best.total) {
+        best = { ...fs, stride, total, partExtent: ext };
+      }
+    }
+    if (!best) return null;
+    const nx_ = best.stack === 0 ? N : 1;
+    const ny_ = best.stack === 1 ? N : 1;
+    const nz_ = best.stack === 2 ? N : 1;
+    const sw = best.stack === 0 ? best.total : w;
+    const sd = best.stack === 1 ? best.total : d;
+    const sh = best.stack === 2 ? best.total : h;
+    return { kind: 'nest-flip', nx: nx_, ny: ny_, nz: nz_, stackW: sw, stackD: sd, stackH: sh,
+             axis: best.stack, flipAxis: best.flip, stride: best.stride,
+             label: `Mesh-nest (flip ${'XYZ'[best.flip]}) · stack ${'XYZ'[best.stack]} stride ${best.stride.toFixed(2)} mm` };
   }
 
-  // Stack bbox dimensions (parts + interior gaps; no exterior padding).
-  // For nesting, the stride along the nest axis replaces (w+gap)/(d+gap)/(h+gap).
-  let stackW, stackD, stackH;
-  if (modeUsed === 'nest') {
-    const eff = [w + gap, d + gap, h + gap];
-    eff[nestAxisIdx] = nestStride + gap;
-    // Total span on nest axis: (N-1)*(stride+gap) + partExtent
-    stackW = (nestAxisIdx === 0 ? (N - 1) * (nestStride + gap) + w : w);
-    stackD = (nestAxisIdx === 1 ? (N - 1) * (nestStride + gap) + d : d);
-    stackH = (nestAxisIdx === 2 ? (N - 1) * (nestStride + gap) + h : h);
-  } else {
-    stackW = nx * w + Math.max(0, nx - 1) * gap;
-    stackD = ny * d + Math.max(0, ny - 1) * gap;
-    stackH = nz * h + Math.max(0, nz - 1) * gap;
+  let plan;
+  if (mode === '1d') plan = aabb1DPlan();
+  else if (mode === 'auto') plan = aabbAutoPlan();
+  else if (mode === 'nest') plan = nestTransPlan() || aabb1DPlan();
+  else if (mode === 'nest-flip') plan = nestFlipPlan() || aabb1DPlan();
+  else { // auto-best
+    const candidates = [aabb1DPlan(), aabbAutoPlan(), nestTransPlan(), nestFlipPlan()].filter(Boolean);
+    candidates.forEach(c => c.vol = c.stackW * c.stackD * c.stackH);
+    candidates.sort((a, b) => a.vol - b.vol);
+    plan = candidates[0];
   }
+
+  const { nx, ny, nz, stackW, stackD, stackH } = plan;
+  const stackAxisLabel = plan.label;
+  const isFlipPlan = plan.kind === 'nest-flip';
+  const flipAxis = plan.flipAxis;
 
   // Tear down previous instances
   if (instancedMesh) { scene.remove(instancedMesh); try { instancedMesh.dispose(); } catch (_) {} instancedMesh = null; }
@@ -421,9 +488,10 @@ function rebuildPack() {
   const dummy = new THREE.Object3D();
   let placed = 0;
   // Per-axis step size — nesting overrides the step on its chosen axis
-  const stepX = (modeUsed === 'nest' && nestAxisIdx === 0) ? (nestStride + gap) : (w + gap);
-  const stepY = (modeUsed === 'nest' && nestAxisIdx === 1) ? (nestStride + gap) : (d + gap);
-  const stepZ = (modeUsed === 'nest' && nestAxisIdx === 2) ? (nestStride + gap) : (h + gap);
+  const isNestPlan = plan.kind === 'nest' || plan.kind === 'nest-flip';
+  const stepX = (isNestPlan && plan.axis === 0) ? (plan.stride + gap) : (w + gap);
+  const stepY = (isNestPlan && plan.axis === 1) ? (plan.stride + gap) : (d + gap);
+  const stepZ = (isNestPlan && plan.axis === 2) ? (plan.stride + gap) : (h + gap);
   outer:
   for (let iz = 0; iz < nz; iz++) {
     for (let iy = 0; iy < ny; iy++) {
@@ -433,7 +501,13 @@ function rebuildPack() {
         const y = -stackD / 2 + d / 2 + iy * stepY;
         const z = -stackH / 2 + h / 2 + iz * stepZ;
         dummy.position.set(x, y, z);
-        dummy.rotation.set(0, 0, 0);
+        if (isFlipPlan && (placed % 2 === 1)) {
+          if (flipAxis === 0)      dummy.rotation.set(Math.PI, 0, 0);
+          else if (flipAxis === 1) dummy.rotation.set(0, Math.PI, 0);
+          else                     dummy.rotation.set(0, 0, Math.PI);
+        } else {
+          dummy.rotation.set(0, 0, 0);
+        }
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         instancedMesh.setMatrixAt(placed, dummy.matrix);
@@ -486,24 +560,25 @@ function rebuildPack() {
   const stackVol = stackW * stackD * stackH;
   const bboxFill = (N * partVol) / stackVol * 100;
   let extra = '';
-  if (mode === 'nest' && nestingComputing) {
-    extra = ' · <em style="color:#d2a8ff">computing dense nesting stride…</em>';
-  } else if (mode === 'nest' && nestingResult && !nestingResult.error && modeUsed === 'nest') {
-    const aabbExt = [w, d, h][nestAxisIdx];
-    const ratio = aabbExt / nestStride;
-    const savePct = (1 - nestStride / aabbExt) * 100;
-    let nestNote;
-    if (savePct < 5) {
-      nestNote = `<span style="color:#d2a8ff">this part doesn't nest by translation</span> (stride ${nestStride.toFixed(2)} mm ≈ AABB ${aabbExt.toFixed(2)} mm)`;
-    } else {
-      nestNote = `stride <strong>${nestStride.toFixed(2)} mm</strong> vs AABB ${aabbExt.toFixed(2)} mm — <strong>${ratio.toFixed(2)}× tighter</strong> (saves ${savePct.toFixed(0)}%)`;
+  if ((mode === 'nest' || mode === 'nest-flip' || mode === 'auto-best') && nestingComputing) {
+    extra = ' · <em style="color:#d2a8ff">computing nesting strides…</em>';
+  } else if (mode === 'auto-best' && nestingResult && !nestingResult.error) {
+    const aabbVol = aabb1DPlan().stackW * aabb1DPlan().stackD * aabb1DPlan().stackH;
+    const factor = aabbVol / stackVol;
+    if (factor > 1.05) {
+      extra = ` · <strong>${factor.toFixed(2)}× tighter</strong> than AABB column`;
     }
-    extra = ` · ${nestNote}`;
-  } else if (mode === 'nest' && nestingResult && nestingResult.error) {
-    extra = ` · <span class="err">nesting failed: ${nestingResult.error}; using AABB</span>`;
+  } else if (mode === 'nest' && nestingResult && !nestingResult.error && plan.kind === 'nest') {
+    const aabbExt = [w, d, h][plan.axis];
+    const savePct = (1 - plan.stride / aabbExt) * 100;
+    if (savePct < 5) {
+      extra = ` · <span style="color:#d2a8ff">this part doesn't nest by translation</span>`;
+    } else {
+      extra = ` · stride saves <strong>${savePct.toFixed(0)}%</strong> vs AABB`;
+    }
   }
   stackInfo.innerHTML = `
-    <strong>${N.toLocaleString()}</strong> parts · ${nx} × ${ny} × ${nz} · ${stackAxisLabel} ·
+    <strong>${N.toLocaleString()}</strong> parts · grid ${nx} × ${ny} × ${nz} · ${stackAxisLabel} ·
     bbox <strong>${stackW.toFixed(1)} × ${stackD.toFixed(1)} × ${stackH.toFixed(1)} mm</strong> ·
     fill <strong>${bboxFill.toFixed(1)}%</strong>${extra}
   `;
