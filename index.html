@@ -214,6 +214,34 @@
         gap: 10px;
       }
 
+      .mode-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .mode-tabs button {
+        margin: 0;
+        border-color: var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .mode-tabs button.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .panel {
+        display: none;
+      }
+
+      .panel.active {
+        display: block;
+      }
+
       .hint {
         margin: 10px 0 0;
         color: var(--muted);
@@ -327,6 +355,16 @@
         border-top: 1px solid var(--line);
       }
 
+      .mode-summary {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
       .warning {
         color: var(--warn);
       }
@@ -379,7 +417,7 @@
             <p class="brand-name">Roark / Intelligence</p>
             <div class="product-badge">STL Container Fit Counter</div>
             <h1>How Many Parts Fit?</h1>
-            <p class="hint">Upload an STL, choose a container, and get a packed count with a 3D inspection view.</p>
+            <p class="hint">Upload an STL, choose a container or carton quantity, and get packing outputs with a 3D inspection view.</p>
           </div>
         </div>
         <div class="status" id="status">Loading sample STL...</div>
@@ -387,7 +425,12 @@
 
       <div class="layout">
         <section class="controls" aria-label="Controls">
-          <h2>Container Capacity Input</h2>
+          <h2>Packing Calculator Input</h2>
+
+          <div class="mode-tabs" aria-label="Calculator mode">
+            <button id="fitMode" type="button" class="active">Container fit</button>
+            <button id="packageMode" type="button">Package size</button>
+          </div>
 
           <label for="file">STL file</label>
           <input id="file" type="file" accept=".stl,model/stl" />
@@ -405,11 +448,11 @@
                 <b>5 cm</b>
               </div>
               <div class="demo-item">
-                <span>Container</span>
+                <span>Container test</span>
                 <b>1000 cm cube</b>
               </div>
               <div class="demo-item">
-                <span>Expected count</span>
+                <span>Fit result</span>
                 <b>24,448,800</b>
               </div>
             </div>
@@ -426,34 +469,51 @@
             <button id="sample" type="button">Sample</button>
           </div>
 
-          <label for="preset">Container preset</label>
-          <select id="preset">
-            <option value="1000,1000,1000,cm">Cube 1000 x 1000 x 1000 cm</option>
-            <option value="500,300,200,cm">Box 500 x 300 x 200 cm</option>
-            <option value="120,80,60,cm">Carton 120 x 80 x 60 cm</option>
-            <option value="custom">Custom</option>
-          </select>
+          <div id="fitPanel" class="panel active">
+            <label for="preset">Container preset</label>
+            <select id="preset">
+              <option value="1000,1000,1000,cm">Cube 1000 x 1000 x 1000 cm</option>
+              <option value="500,300,200,cm">Box 500 x 300 x 200 cm</option>
+              <option value="120,80,60,cm">Carton 120 x 80 x 60 cm</option>
+              <option value="custom">Custom</option>
+            </select>
 
-          <label>Container dimensions</label>
-          <div class="row">
-            <input id="cx" type="number" min="0.001" step="0.1" value="1000" aria-label="Container X" />
-            <input id="cy" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Y" />
-            <input id="cz" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Z" />
+            <label>Container dimensions</label>
+            <div class="row">
+              <input id="cx" type="number" min="0.001" step="0.1" value="1000" aria-label="Container X" />
+              <input id="cy" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Y" />
+              <input id="cz" type="number" min="0.001" step="0.1" value="1000" aria-label="Container Z" />
+            </div>
+
+            <label for="containerUnit">Container unit</label>
+            <select id="containerUnit">
+              <option value="10">cm</option>
+              <option value="1">mm</option>
+              <option value="1000">m</option>
+            </select>
+
+            <div class="mode-summary">Answers: Given this container, how many units fit?</div>
           </div>
 
-          <label for="containerUnit">Container unit</label>
-          <select id="containerUnit">
-            <option value="10">cm</option>
-            <option value="1">mm</option>
-            <option value="1000">m</option>
-          </select>
+          <div id="packagePanel" class="panel">
+            <label for="targetQty">Quantity per carton</label>
+            <input id="targetQty" type="number" min="1" step="1" value="50" />
+
+            <label for="partGap">Space between parts (mm)</label>
+            <input id="partGap" type="number" min="0" step="0.1" value="1" />
+
+            <label for="unitWeight">Unit weight (kg, optional)</label>
+            <input id="unitWeight" type="number" min="0" step="0.001" placeholder="e.g. 3.601" />
+
+            <div class="mode-summary">Answers: Given this carton quantity, what package size is required?</div>
+          </div>
 
           <p class="hint">STL files do not contain a reliable real-world unit, so the actual part height is used to scale the imported model.</p>
         </section>
 
         <section class="results" aria-label="Results">
           <div class="headline">
-            <div class="result-label">Maximum fitted quantity</div>
+            <div class="result-label" id="resultLabel">Maximum fitted quantity</div>
             <div class="count" id="count">-</div>
             <div class="subcount" id="summary">Waiting for STL geometry</div>
           </div>
@@ -491,7 +551,11 @@
             </div>
             <div class="metric">
               <span>Method</span>
-              <strong>6 orientations</strong>
+              <strong id="method">6 orientations</strong>
+            </div>
+            <div class="metric">
+              <span id="extraMetricLabel">Package volume</span>
+              <strong id="extraMetric">-</strong>
             </div>
           </div>
 
@@ -514,6 +578,10 @@
 
       const els = {
         file: document.getElementById("file"),
+        fitMode: document.getElementById("fitMode"),
+        packageMode: document.getElementById("packageMode"),
+        fitPanel: document.getElementById("fitPanel"),
+        packagePanel: document.getElementById("packagePanel"),
         height: document.getElementById("height"),
         heightUnit: document.getElementById("heightUnit"),
         sample: document.getElementById("sample"),
@@ -522,7 +590,11 @@
         cy: document.getElementById("cy"),
         cz: document.getElementById("cz"),
         containerUnit: document.getElementById("containerUnit"),
+        targetQty: document.getElementById("targetQty"),
+        partGap: document.getElementById("partGap"),
+        unitWeight: document.getElementById("unitWeight"),
         status: document.getElementById("status"),
+        resultLabel: document.getElementById("resultLabel"),
         count: document.getElementById("count"),
         summary: document.getElementById("summary"),
         modelDims: document.getElementById("modelDims"),
@@ -530,6 +602,9 @@
         orientation: document.getElementById("orientation"),
         grid: document.getElementById("grid"),
         packedDims: document.getElementById("packedDims"),
+        method: document.getElementById("method"),
+        extraMetricLabel: document.getElementById("extraMetricLabel"),
+        extraMetric: document.getElementById("extraMetric"),
         note: document.getElementById("note"),
         viewer: document.getElementById("viewer"),
         partView: document.getElementById("partView"),
@@ -545,6 +620,7 @@
       let packedGroup = null;
       let packedBounds = null;
       let viewerMode = "part";
+      let calculatorMode = "fit";
       let lastBest = null;
       let lastScale = 1;
       const sampleRawExtents = [
@@ -561,6 +637,10 @@
 
       function fmtDims(values) {
         return values.map((v) => fmt(v)).join(" x ") + " mm";
+      }
+
+      function volumeM3(values) {
+        return (values[0] * values[1] * values[2]) / 1e9;
       }
 
       function permutations(values) {
@@ -589,6 +669,31 @@
           }
         }
         return out;
+      }
+
+      function compactGrid(quantity, dims, gap) {
+        let best = null;
+        const target = Math.ceil(Math.cbrt(quantity)) + 8;
+        for (let x = 1; x <= target * 4; x += 1) {
+          for (let y = 1; y <= target * 4; y += 1) {
+            const z = Math.ceil(quantity / (x * y));
+            if (z < 1 || x * y * z < quantity) continue;
+            const occupied = [
+              x * dims[0] + Math.max(0, x - 1) * gap,
+              y * dims[1] + Math.max(0, y - 1) * gap,
+              z * dims[2] + Math.max(0, z - 1) * gap,
+            ];
+            const longest = Math.max(...occupied);
+            const volume = occupied[0] * occupied[1] * occupied[2];
+            const slack = x * y * z - quantity;
+            const score = volume + longest * longest * slack;
+            if (!best || score < best.score) {
+              best = { grid: [x, y, z], occupied, score, slack };
+            }
+            if (x * y >= quantity) break;
+          }
+        }
+        return best;
       }
 
       function parseAsciiStl(text) {
@@ -832,11 +937,13 @@
 
         const dims = best.orientation;
         const fullGrid = best.grid;
-        const occupied = dims.map((value, axis) => value * fullGrid[axis]);
+        const occupied = best.occupied || dims.map((value, axis) => value * fullGrid[axis]);
         const displayGrid = makePackedDisplayGrid(fullGrid);
         const displayCount = displayGrid.reduce((product, value) => product * value, 1);
         const aggregateMode = displayCount < best.count;
-        const displayCell = dims.map((value) => value * (aggregateMode ? 1.35 : 1.05));
+        const displayCell = aggregateMode
+          ? dims.map((value) => value * 1.35)
+          : occupied.map((value, axis) => value / displayGrid[axis]);
         const visualSize = displayCell.map((value, axis) => value * displayGrid[axis]);
         const visibleBlock = displayCell.map((value) => value * (aggregateMode ? 0.86 : 0.96));
 
@@ -903,11 +1010,7 @@
         }
 
         const actualHeightMm = Number(els.height.value) * Number(els.heightUnit.value);
-        const container = [Number(els.cx.value), Number(els.cy.value), Number(els.cz.value)].map(
-          (value) => value * Number(els.containerUnit.value),
-        );
-
-        if (!actualHeightMm || container.some((value) => !value || value <= 0)) {
+        if (!actualHeightMm) {
           els.summary.textContent = "Enter positive dimensions.";
           return;
         }
@@ -917,31 +1020,89 @@
         updateViewerScale(scale, viewerMode === "part");
         let best = null;
 
+        if (calculatorMode === "fit") {
+          const container = [Number(els.cx.value), Number(els.cy.value), Number(els.cz.value)].map(
+            (value) => value * Number(els.containerUnit.value),
+          );
+
+          if (container.some((value) => !value || value <= 0)) {
+            els.summary.textContent = "Enter positive container dimensions.";
+            return;
+          }
+
+          for (const orientation of permutations(model)) {
+            const grid = orientation.map((value, axis) => Math.floor(container[axis] / value));
+            const count = grid.reduce((product, value) => product * value, 1);
+            if (!best || count > best.count) {
+              best = { count, orientation, grid };
+            }
+          }
+
+          lastBest = best;
+          buildPackedView(best);
+
+          const occupied = best.orientation.map((value, axis) => value * best.grid[axis]);
+          els.resultLabel.textContent = "Maximum fitted quantity";
+          els.count.textContent = fmt(best.count, 0);
+          els.summary.textContent = `${currentName} inside selected container`;
+          els.modelDims.textContent = fmtDims(model);
+          els.containerDims.textContent = fmtDims(container);
+          els.orientation.textContent = fmtDims(best.orientation);
+          els.grid.textContent = best.grid.map((value) => fmt(value, 0)).join(" x ");
+          els.packedDims.textContent = fmtDims(occupied);
+          els.method.textContent = "Container fit";
+          els.extraMetricLabel.textContent = "Used volume";
+          els.extraMetric.textContent = `${fmt(volumeM3(occupied), 4)} m3`;
+          els.note.className = "note";
+          const shown = packedGroup?.userData?.displayCount ?? best.count;
+          const shownText =
+            shown < best.count
+              ? ` Packed view shows a readable representative stack; each visible block represents a group of parts.`
+              : "";
+          els.note.textContent = `Exact post-stacking bounding box: ${fmtDims(occupied)}.${shownText} Count and dimensions are exact axis-aligned bounding-box results.`;
+          return;
+        }
+
+        const quantity = Math.max(1, Math.floor(Number(els.targetQty.value) || 1));
+        const gap = Math.max(0, Number(els.partGap.value) || 0);
         for (const orientation of permutations(model)) {
-          const grid = orientation.map((value, axis) => Math.floor(container[axis] / value));
-          const count = grid.reduce((product, value) => product * value, 1);
-          if (!best || count > best.count) {
-            best = { count, orientation, grid };
+          const packed = compactGrid(quantity, orientation, gap);
+          if (!packed) continue;
+          const volume = packed.occupied[0] * packed.occupied[1] * packed.occupied[2];
+          if (!best || volume < best.volume) {
+            best = {
+              count: quantity,
+              orientation,
+              grid: packed.grid,
+              occupied: packed.occupied,
+              volume,
+              slack: packed.slack,
+            };
           }
         }
+
         lastBest = best;
         buildPackedView(best);
 
-        els.count.textContent = fmt(best.count, 0);
-        els.summary.textContent = `${currentName} calculated instantly from bounding-box packing`;
+        const pkgVol = volumeM3(best.occupied);
+        const unitWeight = Number(els.unitWeight.value);
+        const totalWeight = unitWeight > 0 ? unitWeight * quantity : null;
+        const volumetricWeight = pkgVol * 167;
+        els.resultLabel.textContent = "Required packaging size";
+        els.count.textContent = fmtDims(best.occupied);
+        els.summary.textContent = `${fmt(quantity, 0)} units per carton, ${fmt(gap, 1)} mm spacing`;
         els.modelDims.textContent = fmtDims(model);
-        els.containerDims.textContent = fmtDims(container);
+        els.containerDims.textContent = "Calculated carton";
         els.orientation.textContent = fmtDims(best.orientation);
-        els.grid.textContent = best.grid.map((value) => fmt(value, 0)).join(" x ");
-        const occupied = best.orientation.map((value, axis) => value * best.grid[axis]);
-        els.packedDims.textContent = fmtDims(occupied);
+        els.grid.textContent = `${best.grid.map((value) => fmt(value, 0)).join(" x ")} (${fmt(best.slack, 0)} spare slots)`;
+        els.packedDims.textContent = fmtDims(best.occupied);
+        els.method.textContent = "Carton optimizer";
+        els.extraMetricLabel.textContent = totalWeight ? "Weight / volume" : "Volume / volumetric weight";
+        els.extraMetric.textContent = totalWeight
+          ? `${fmt(totalWeight, 2)} kg / ${fmt(pkgVol, 4)} m3`
+          : `${fmt(pkgVol, 4)} m3 / ${fmt(volumetricWeight, 2)} kg`;
         els.note.className = "note";
-        const shown = packedGroup?.userData?.displayCount ?? best.count;
-        const shownText =
-          shown < best.count
-            ? ` Packed view shows a readable representative stack; each visible block represents a group of parts.`
-            : "";
-        els.note.textContent = `Exact post-stacking bounding box: ${fmtDims(occupied)}.${shownText} Count and dimensions are exact axis-aligned bounding-box results.`;
+        els.note.textContent = `Package size mode calculates the smallest axis-aligned carton found for ${fmt(quantity, 0)} units with ${fmt(gap, 1)} mm spacing. Volumetric weight uses 167 kg/m3.`;
       }
 
       async function loadSample() {
@@ -1000,6 +1161,22 @@
       els.partView.addEventListener("click", () => setViewerMode("part"));
       els.stackView.addEventListener("click", () => setViewerMode("packed"));
       els.resetView.addEventListener("click", fitCameraToModel);
+      els.fitMode.addEventListener("click", () => {
+        calculatorMode = "fit";
+        els.fitMode.classList.add("active");
+        els.packageMode.classList.remove("active");
+        els.fitPanel.classList.add("active");
+        els.packagePanel.classList.remove("active");
+        calculate();
+      });
+      els.packageMode.addEventListener("click", () => {
+        calculatorMode = "package";
+        els.packageMode.classList.add("active");
+        els.fitMode.classList.remove("active");
+        els.packagePanel.classList.add("active");
+        els.fitPanel.classList.remove("active");
+        calculate();
+      });
 
       els.preset.addEventListener("change", () => {
         if (els.preset.value === "custom") {
@@ -1013,9 +1190,21 @@
         calculate();
       });
 
-      for (const el of [els.height, els.heightUnit, els.cx, els.cy, els.cz, els.containerUnit]) {
+      for (const el of [
+        els.height,
+        els.heightUnit,
+        els.cx,
+        els.cy,
+        els.cz,
+        els.containerUnit,
+        els.targetQty,
+        els.partGap,
+        els.unitWeight,
+      ]) {
         el.addEventListener("input", () => {
-          els.preset.value = "custom";
+          if ([els.cx, els.cy, els.cz, els.containerUnit].includes(el)) {
+            els.preset.value = "custom";
+          }
           calculate();
         });
       }
