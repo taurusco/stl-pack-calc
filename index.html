@@ -188,7 +188,7 @@
       }
 
       .count {
-        font-size: clamp(44px, 7vw, 86px);
+        font-size: clamp(42px, 5.8vw, 72px);
         line-height: 1;
         font-weight: 900;
         letter-spacing: 0;
@@ -386,8 +386,8 @@
           <div class="viewer-wrap">
             <div id="viewer" aria-label="Interactive STL viewer"></div>
             <div class="viewer-actions">
-              <button id="partView" type="button">Part</button>
-              <button id="stackView" type="button" class="active">Packed stack</button>
+              <button id="partView" type="button" class="active">Part</button>
+              <button id="stackView" type="button">Packed stack</button>
               <button id="resetView" type="button">Reset view</button>
             </div>
             <div class="viewer-help">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
@@ -465,7 +465,7 @@
       let modelEdges = null;
       let packedGroup = null;
       let packedBounds = null;
-      let viewerMode = "packed";
+      let viewerMode = "part";
       let lastBest = null;
       let lastScale = 1;
       const sampleRawExtents = [
@@ -694,7 +694,7 @@
         const sphere = box.getBoundingSphere(new THREE.Sphere());
         const radius = Math.max(sphere.radius, 1);
         const center = sphere.center;
-        const distance = viewerMode === "packed" ? radius * 4.8 : radius * 3.2;
+        const distance = viewerMode === "packed" ? radius * 3.8 : radius * 3.2;
         camera.position.set(
           center.x + distance * 0.78,
           center.y + distance * 0.58,
@@ -757,10 +757,9 @@
         const displayGrid = makePackedDisplayGrid(fullGrid);
         const displayCount = displayGrid.reduce((product, value) => product * value, 1);
         const aggregateMode = displayCount < best.count;
-        const displayCell = aggregateMode
-          ? occupied.map((value, axis) => value / displayGrid[axis])
-          : [...dims];
-        const visibleBlock = displayCell.map((value) => value * (aggregateMode ? 0.94 : 0.96));
+        const displayCell = dims.map((value) => value * (aggregateMode ? 1.35 : 1.05));
+        const visualSize = displayCell.map((value, axis) => value * displayGrid[axis]);
+        const visibleBlock = displayCell.map((value) => value * (aggregateMode ? 0.86 : 0.96));
 
         const boxGeometry = new THREE.BoxGeometry(visibleBlock[0], visibleBlock[1], visibleBlock[2]);
         const boxMaterial = new THREE.MeshStandardMaterial({
@@ -779,9 +778,9 @@
           for (let y = 0; y < displayGrid[1]; y += 1) {
             for (let z = 0; z < displayGrid[2]; z += 1) {
               matrix.makeTranslation(
-                x * displayCell[0] + displayCell[0] / 2 - occupied[0] / 2,
-                y * displayCell[1] + displayCell[1] / 2 - occupied[1] / 2,
-                z * displayCell[2] + displayCell[2] / 2 - occupied[2] / 2,
+                x * displayCell[0] + displayCell[0] / 2 - visualSize[0] / 2,
+                y * displayCell[1] + displayCell[1] / 2 - visualSize[1] / 2,
+                z * displayCell[2] + displayCell[2] / 2 - visualSize[2] / 2,
               );
               instances.setMatrixAt(item, matrix);
               color.setHSL(0.58, 0.16, 0.58 + ((x + y + z) % 3) * 0.06);
@@ -798,14 +797,14 @@
 
         scene.add(packedGroup);
 
-        const boundsGeometry = new THREE.BoxGeometry(occupied[0], occupied[1], occupied[2]);
+        const boundsGeometry = new THREE.BoxGeometry(visualSize[0], visualSize[1], visualSize[2]);
         packedBounds = new THREE.LineSegments(
           new THREE.EdgesGeometry(boundsGeometry),
           new THREE.LineBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.95 }),
         );
         scene.add(packedBounds);
 
-        packedGroup.userData = { displayCount, occupied, aggregateMode };
+        packedGroup.userData = { displayCount, occupied, aggregateMode, visualSize };
         setViewerMode(viewerMode);
       }
 
@@ -861,9 +860,9 @@
         const shown = packedGroup?.userData?.displayCount ?? best.count;
         const shownText =
           shown < best.count
-            ? ` Packed view shows ${fmt(shown, 0)} aggregate stack blocks; each block represents a group of parts.`
+            ? ` Packed view shows a readable representative stack; each visible block represents a group of parts.`
             : "";
-        els.note.textContent = `Post-stacking bounding box: ${fmtDims(occupied)}.${shownText} Count uses exact axis-aligned bounding-box packing.`;
+        els.note.textContent = `Exact post-stacking bounding box: ${fmtDims(occupied)}.${shownText} Count and dimensions are exact axis-aligned bounding-box results.`;
       }
 
       async function loadSample() {
