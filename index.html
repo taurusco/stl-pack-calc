@@ -131,8 +131,15 @@
 
   <div class="card">
     <div class="small">
-      <strong>Mesh nesting</strong> (default) uses BVH-accelerated triangle-mesh collision to find the smallest pure-translation stride along each axis with no part-to-part overlap, then picks the tightest axis. This catches U-channels, cups, and trays that slot into themselves. Some parts (closed brackets, solids) don't nest by translation — the tool will report this honestly and the result will match AABB.<br><br>
-      <strong>Currently not modeled:</strong> alternating 180° flips between adjacent parts (common in real sheet-metal packaging), rotational nesting, and multi-axis offsets. These can yield additional density beyond pure translation.
+      <strong>How it works.</strong> The tool tries four packing strategies and shows the densest result:
+      <ol style="margin:6px 0 0; padding-left:22px">
+        <li><strong>AABB column</strong> — stack identical bounding boxes along the part's shortest axis.</li>
+        <li><strong>AABB 3D grid</strong> — pick the (n<sub>x</sub>, n<sub>y</sub>, n<sub>z</sub>) layout that minimizes the longest outer side.</li>
+        <li><strong>Mesh nesting (translation)</strong> — BVH-accelerated triangle-mesh collision, binary-searches the smallest non-overlap offset on each axis. Catches cups, U-channels, and trays that slot into themselves.</li>
+        <li><strong>Mesh nesting (alternating flip)</strong> — every second part rotated 180° around one axis. Mating opposite orientations works well for trapezoidal sheet-metal profiles, Z-sections, and other parts that don't nest by pure translation.</li>
+      </ol>
+      Some parts (closed brackets, fully solid blocks) don't nest at all — the tool falls back to AABB and reports that honestly.<br><br>
+      <strong>Not yet modeled:</strong> rotational nesting (continuous rotation rather than 180° flip), multi-axis offsets, mesh-vs-mesh interlocking. These could squeeze a bit more density on certain parts.
     </div>
   </div>
 </div>
@@ -318,6 +325,7 @@ async function computeNesting() {
     nestingResult = { error: err.message };
   } finally {
     nestingComputing = false;
+    cameraInitialized = false;  // Force a camera refit so the post-nesting bbox shows up sized correctly
     rebuildPack();
   }
 }
@@ -556,31 +564,23 @@ function rebuildPack() {
   document.getElementById('pkgGap').textContent = gap;
   document.getElementById('pkgGrid').textContent = `${nx} × ${ny} × ${nz}`;
 
-  const partVol = w * d * h;
   const stackVol = stackW * stackD * stackH;
-  const bboxFill = (N * partVol) / stackVol * 100;
+  const aabbBaseline = aabb1DPlan();
+  const aabbVol = aabbBaseline.stackW * aabbBaseline.stackD * aabbBaseline.stackH;
+  const tighter = aabbVol / stackVol;
   let extra = '';
-  if ((mode === 'nest' || mode === 'nest-flip' || mode === 'auto-best') && nestingComputing) {
+  if (nestingComputing && (mode === 'nest' || mode === 'nest-flip' || mode === 'auto-best')) {
     extra = ' · <em style="color:#d2a8ff">computing nesting strides…</em>';
-  } else if (mode === 'auto-best' && nestingResult && !nestingResult.error) {
-    const aabbVol = aabb1DPlan().stackW * aabb1DPlan().stackD * aabb1DPlan().stackH;
-    const factor = aabbVol / stackVol;
-    if (factor > 1.05) {
-      extra = ` · <strong>${factor.toFixed(2)}× tighter</strong> than AABB column`;
-    }
-  } else if (mode === 'nest' && nestingResult && !nestingResult.error && plan.kind === 'nest') {
-    const aabbExt = [w, d, h][plan.axis];
-    const savePct = (1 - plan.stride / aabbExt) * 100;
-    if (savePct < 5) {
-      extra = ` · <span style="color:#d2a8ff">this part doesn't nest by translation</span>`;
+  } else if (plan.kind === 'nest' || plan.kind === 'nest-flip') {
+    if (tighter < 1.05) {
+      extra = ` · <span style="color:#d2a8ff">this part doesn't nest meaningfully — AABB is the best fit</span>`;
     } else {
-      extra = ` · stride saves <strong>${savePct.toFixed(0)}%</strong> vs AABB`;
+      extra = ` · <strong>${tighter.toFixed(2)}× tighter</strong> than AABB column (saves ${((1 - 1/tighter) * 100).toFixed(0)}% volume)`;
     }
   }
   stackInfo.innerHTML = `
     <strong>${N.toLocaleString()}</strong> parts · grid ${nx} × ${ny} × ${nz} · ${stackAxisLabel} ·
-    bbox <strong>${stackW.toFixed(1)} × ${stackD.toFixed(1)} × ${stackH.toFixed(1)} mm</strong> ·
-    fill <strong>${bboxFill.toFixed(1)}%</strong>${extra}
+    bbox <strong>${stackW.toFixed(1)} × ${stackD.toFixed(1)} × ${stackH.toFixed(1)} mm</strong>${extra}
   `;
 }
 </script>
